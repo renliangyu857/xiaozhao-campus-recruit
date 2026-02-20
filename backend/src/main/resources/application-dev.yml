@@ -1,0 +1,4 @@
+# 开发时 8080 被占用时使用：mvn spring-boot:run "-Dspring-boot.run.profiles=supabase,upstash,dev"
+# 仅覆盖端口，数据库等仍由 supabase/upstash 提供
+server:
+  port: 8081

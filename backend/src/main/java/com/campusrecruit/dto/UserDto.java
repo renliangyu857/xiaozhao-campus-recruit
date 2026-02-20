@@ -8,6 +8,7 @@ public class UserDto {
     private String nickname;
     private String avatar;
     private Boolean isVip;
+    private Boolean isTrial;
     private String vipExpiry;
     private Integer queryCount;
     private Integer remainingFreeQueries;
@@ -20,6 +21,8 @@ public class UserDto {
     public void setAvatar(String avatar) { this.avatar = avatar; }
     public Boolean getIsVip() { return isVip; }
     public void setIsVip(Boolean isVip) { this.isVip = isVip; }
+    public Boolean getIsTrial() { return isTrial; }
+    public void setIsTrial(Boolean isTrial) { this.isTrial = isTrial; }
     public String getVipExpiry() { return vipExpiry; }
     public void setVipExpiry(String vipExpiry) { this.vipExpiry = vipExpiry; }
     public Integer getQueryCount() { return queryCount; }

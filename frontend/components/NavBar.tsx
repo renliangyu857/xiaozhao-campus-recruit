@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Crown, BarChart3, List, User as UserIcon, Sparkles } from 'lucide-react';
+import { Crown, BarChart3, List, User as UserIcon, Sparkles, KeyRound, Gift } from 'lucide-react';
 import { User } from '../types';
 
 interface NavBarProps {
@@ -59,6 +59,16 @@ export const NavBar: React.FC<NavBarProps> = ({ user, onLogin }) => {
                 <Crown size={16} className={user?.isVip ? 'text-yellow-500 fill-yellow-500' : ''} />
                 会员中心
               </button>
+              {user && (
+                <button onClick={() => navigate('/invite')} className={`px-4 py-2 rounded-full text-sm transition-all duration-200 flex items-center gap-2 ${isActive('/invite')}`}>
+                  <Gift size={16} /> 邀请有礼
+                </button>
+              )}
+              {user?.isVip && (
+                <button onClick={() => navigate('/referral-codes')} className={`px-4 py-2 rounded-full text-sm transition-all duration-200 flex items-center gap-2 ${isActive('/referral-codes')}`}>
+                  <KeyRound size={16} /> 内推码
+                </button>
+              )}
             </div>
           </div>
           
@@ -106,6 +116,18 @@ export const NavBar: React.FC<NavBarProps> = ({ user, onLogin }) => {
             <Crown size={22} strokeWidth={2.5} className={user?.isVip ? 'text-yellow-500 fill-yellow-500' : ''}/>
             <span className="text-[10px] font-medium mt-1">会员</span>
           </button>
+          {user && (
+            <button onClick={() => navigate('/invite')} className={`flex flex-col items-center p-2 rounded-lg w-16 ${location.pathname === '/invite' ? 'text-blue-600' : 'text-slate-400'}`}>
+              <Gift size={22} strokeWidth={2.5} />
+              <span className="text-[10px] font-medium mt-1">邀请有礼</span>
+            </button>
+          )}
+          {user?.isVip && (
+            <button onClick={() => navigate('/referral-codes')} className={`flex flex-col items-center p-2 rounded-lg w-16 ${location.pathname === '/referral-codes' ? 'text-blue-600' : 'text-slate-400'}`}>
+              <KeyRound size={22} strokeWidth={2.5} />
+              <span className="text-[10px] font-medium mt-1">内推码</span>
+            </button>
+          )}
       </div>
     </nav>
   );

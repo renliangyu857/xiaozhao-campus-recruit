@@ -4,8 +4,11 @@ import { ApplyStatus, Job, User } from './types';
 import { NavBar } from './components/NavBar';
 import { HomePage } from './pages/HomePage';
 import { VIPPage } from './pages/VIPPage';
+import { ReferralCodesPage } from './pages/ReferralCodesPage';
+import { InvitePage } from './pages/InvitePage';
 import { ProgressPage } from './pages/ProgressPage';
-import { getCurrentUser, logout, wechatLogin } from './services/authService';
+import { getCurrentUser, wechatLogin } from './services/authService';
+import { bindInviteCode } from './services/inviteService';
 import { fetchJobsPage, updateJobStatus as apiUpdateJobStatus } from './services/jobService';
 
 const App: React.FC = () => {
@@ -13,19 +16,38 @@ const App: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    const code = params.get('inviteCode');
+    if (code) sessionStorage.setItem('inviteCode', code);
+  }, []);
+
+  const defaultFilters = { industry: 'ALL' as const, type: 'ALL' as const, location: '', deadlineDays: 'ALL' as const, roles: '' };
+
+  const loadJobsIfHasPermission = (u: User) => {
+    fetchJobsPage(defaultFilters, false, 0, 30)
+      .then((res) => setJobs(res.content || []))
+      .catch(() => setJobs([]));
+  };
+
+  useEffect(() => {
     (async () => {
-      // 1) 当前用户（基于 Spring Session cookie）
       try {
         const u = await getCurrentUser();
         setUser(u);
+        if (u?.id) loadJobsIfHasPermission(u);
       } catch {
         setUser(null);
       }
-      // 2) 初始列表（仅登录用户加载，未登录时不加载）
-      // 注意：如果用户已登录，这里可以预加载第一页；未登录时由用户点击查询时提示登录
-      // 暂时不自动加载，等待用户主动查询
     })();
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const code = sessionStorage.getItem('inviteCode');
+    if (!code) return;
+    sessionStorage.removeItem('inviteCode');
+    bindInviteCode(code).then(() => {}).catch(() => {});
+  }, [user?.id]);
 
   const handleLogin = () => {
     (async () => {
@@ -35,10 +57,12 @@ const App: React.FC = () => {
       try {
         const u = await wechatLogin(code);
         setUser(u);
-        // 登录成功后可以预加载第一页数据（可选）
-        // const emptyFilters: any = { industry: 'ALL', type: 'ALL', location: '', deadlineDays: 'ALL', roles: '' };
-        // const result = await fetchJobsPage(emptyFilters, false, 0, 30);
-        // setJobs(result.content || []);
+        const savedCode = sessionStorage.getItem('inviteCode');
+        if (savedCode) {
+          sessionStorage.removeItem('inviteCode');
+          try { await bindInviteCode(savedCode); } catch (_) {}
+        }
+        if (u?.id) loadJobsIfHasPermission(u);
       } catch (e: any) {
         alert(e?.body?.message || e?.message || '登录失败');
       }
@@ -110,6 +134,8 @@ const App: React.FC = () => {
                 />
               } 
             />
+            <Route path="/referral-codes" element={<ReferralCodesPage user={user} />} />
+            <Route path="/invite" element={<InvitePage user={user} />} />
             <Route 
               path="/progress" 
               element={

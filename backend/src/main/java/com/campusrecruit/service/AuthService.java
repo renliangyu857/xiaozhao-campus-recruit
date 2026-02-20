@@ -18,21 +18,27 @@ import java.util.Optional;
 @Service
 public class AuthService {
 
+    /** 体验会员 plan_id */
+    public static final String PLAN_TRIAL = "trial";
+
     private final WeChatAuthClient weChatAuthClient;
     private final UserRepository userRepository;
     private final UserMemberRepository userMemberRepository;
     private final int maxFreeQueries;
+    private final int trialVipDays;
 
     public AuthService(
             WeChatAuthClient weChatAuthClient,
             UserRepository userRepository,
             UserMemberRepository userMemberRepository,
-            @Value("${app.max-free-queries:3}") int maxFreeQueries
+            @Value("${app.max-free-queries:3}") int maxFreeQueries,
+            @Value("${app.trial-vip-days:0}") int trialVipDays
     ) {
         this.weChatAuthClient = weChatAuthClient;
         this.userRepository = userRepository;
         this.userMemberRepository = userMemberRepository;
         this.maxFreeQueries = maxFreeQueries;
+        this.trialVipDays = trialVipDays;
     }
 
     /** Session 中存放当前用户 ID 的 key */
@@ -54,6 +60,11 @@ public class AuthService {
         return userRepository.findById(userId).map(this::toDto);
     }
 
+    public boolean isVip(Long userId) {
+        if (userId == null) return false;
+        return !userMemberRepository.findActiveByUserId(userId, LocalDateTime.now(), PageRequest.of(0, 1)).isEmpty();
+    }
+
     private User createUser(String openId) {
         User user = new User();
         user.setOpenId(openId);
@@ -61,7 +72,28 @@ public class AuthService {
         user.setAvatar("");
         user.setQueryCount(0);
         user.setQueryCountResetAt(LocalDate.now());
-        return userRepository.save(user);
+        user = userRepository.save(user);
+        if (trialVipDays > 0) {
+            grantTrialVip(user.getId());
+        }
+        return user;
+    }
+
+    private void grantTrialVip(Long userId) {
+        grantVipDays(userId, trialVipDays, PLAN_TRIAL);
+    }
+
+    /** 为用户增加 N 天 VIP（邀请奖励等），planId 如 "promo" 或 PLAN_TRIAL */
+    public void grantVipDays(Long userId, int days, String planId) {
+        if (userId == null || days <= 0) return;
+        LocalDateTime start = LocalDateTime.now();
+        LocalDateTime end = start.plusDays(days);
+        UserMember m = new UserMember();
+        m.setUserId(userId);
+        m.setPlanId(planId != null ? planId : "promo");
+        m.setStartAt(start);
+        m.setEndAt(end);
+        userMemberRepository.save(m);
     }
 
     private UserDto toDto(User user) {
@@ -74,14 +106,18 @@ public class AuthService {
         List<UserMember> active = userMemberRepository.findActiveByUserId(
                 user.getId(), LocalDateTime.now(), PageRequest.of(0, 1));
         if (!active.isEmpty()) {
+            UserMember m = active.get(0);
             dto.setIsVip(true);
-            dto.setVipExpiry(active.get(0).getEndAt().toLocalDate().toString());
+            dto.setIsTrial(PLAN_TRIAL.equals(m.getPlanId()));
+            dto.setVipExpiry(m.getEndAt().toLocalDate().toString());
             dto.setRemainingFreeQueries(null);
         } else {
+            dto.setIsTrial(false);
             dto.setIsVip(false);
             dto.setVipExpiry(null);
             int used = effectiveUsedCount(user);
-            int remaining = Math.max(0, maxFreeQueries - used);
+            int bonus = user.getBonusQueries() != null ? user.getBonusQueries() : 0;
+            int remaining = Math.max(0, maxFreeQueries - used) + bonus;
             dto.setRemainingFreeQueries(remaining);
         }
         return dto;

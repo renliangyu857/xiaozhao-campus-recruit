@@ -49,6 +49,16 @@ public class QueryService {
             return QueryConsumeResult.allowedVip();
         }
 
+        int bonus = user.getBonusQueries() != null ? user.getBonusQueries() : 0;
+        if (bonus > 0) {
+            user.setBonusQueries(bonus - 1);
+            userRepository.save(user);
+            LocalDate today = LocalDate.now();
+            int used = (user.getQueryCountResetAt() != null && !user.getQueryCountResetAt().isBefore(today))
+                    ? (user.getQueryCount() != null ? user.getQueryCount() : 0) : 0;
+            return QueryConsumeResult.allowed(Math.max(0, maxFreeQueries - used) + (bonus - 1));
+        }
+
         LocalDate today = LocalDate.now();
         if (user.getQueryCountResetAt() == null || user.getQueryCountResetAt().isBefore(today)) {
             user.setQueryCount(0);

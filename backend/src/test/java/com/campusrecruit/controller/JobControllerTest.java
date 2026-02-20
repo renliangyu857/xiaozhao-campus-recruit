@@ -3,6 +3,8 @@ package com.campusrecruit.controller;
 import com.campusrecruit.entity.Job;
 import com.campusrecruit.repository.JobRepository;
 import com.campusrecruit.repository.UserJobStatusRepository;
+import com.campusrecruit.repository.UserMemberRepository;
+import com.campusrecruit.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,12 +44,24 @@ class JobControllerTest {
     private UserJobStatusRepository userJobStatusRepository;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private UserMemberRepository userMemberRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
+    private MockHttpSession listSession;
+
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         userJobStatusRepository.deleteAll();
         jobRepository.deleteAll();
+        userMemberRepository.deleteAll();
+        userRepository.deleteAll();
+        var loginRes = mockMvc.perform(get("/auth/wechat/login").param("code", "openid_joblist")).andExpect(status().isOk()).andReturn();
+        listSession = (MockHttpSession) loginRes.getRequest().getSession();
     }
 
     @Nested
@@ -57,7 +71,7 @@ class JobControllerTest {
         @Test
         @DisplayName("无数据时返回空分页")
         void emptyList() throws Exception {
-            mockMvc.perform(get("/jobs"))
+            mockMvc.perform(get("/jobs").session(listSession))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", hasSize(0)))
                     .andExpect(jsonPath("$.totalElements").value(0))
@@ -85,7 +99,7 @@ class JobControllerTest {
             job.setUpdatedAt(LocalDateTime.now());
             jobRepository.save(job);
 
-            mockMvc.perform(get("/jobs"))
+            mockMvc.perform(get("/jobs").session(listSession))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", hasSize(1)))
                     .andExpect(jsonPath("$.content[0].id").value(notNullValue()))
@@ -105,7 +119,7 @@ class JobControllerTest {
             saveJob("A公司", "互联网", "秋招");
             saveJob("B公司", "金融", "春招");
 
-            mockMvc.perform(get("/jobs").param("industry", "互联网"))
+            mockMvc.perform(get("/jobs").session(listSession).param("industry", "互联网"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", hasSize(1)))
                     .andExpect(jsonPath("$.content[0].company").value("A公司"));
@@ -117,7 +131,7 @@ class JobControllerTest {
             saveJob("A公司", "互联网", "秋招");
             saveJob("B公司", "互联网", "实习");
 
-            mockMvc.perform(get("/jobs").param("type", "秋招"))
+            mockMvc.perform(get("/jobs").session(listSession).param("type", "秋招"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", hasSize(1)))
                     .andExpect(jsonPath("$.content[0].company").value("A公司"));
@@ -129,7 +143,7 @@ class JobControllerTest {
             saveJobWithLocations("A公司", "[\"北京\",\"上海\"]");
             saveJobWithLocations("B公司", "[\"深圳\"]");
 
-            mockMvc.perform(get("/jobs").param("location", "北京"))
+            mockMvc.perform(get("/jobs").session(listSession).param("location", "北京"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", hasSize(1)))
                     .andExpect(jsonPath("$.content[0].company").value("A公司"));
@@ -142,7 +156,7 @@ class JobControllerTest {
             saveJobWithEndDate("Soon", today.plusDays(2));   // 3天内
             saveJobWithEndDate("Later", today.plusDays(10)); // 超出7天
 
-            mockMvc.perform(get("/jobs").param("deadlineDays", "7"))
+            mockMvc.perform(get("/jobs").session(listSession).param("deadlineDays", "7"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", hasSize(1)))
                     .andExpect(jsonPath("$.content[0].company").value("Soon"));
@@ -154,7 +168,7 @@ class JobControllerTest {
             saveJobWithRoles("FrontendJob", "[\"前端\",\"React\"]");
             saveJobWithRoles("BackendJob", "[\"后端\",\"Java\"]");
 
-            mockMvc.perform(get("/jobs").param("roles", "前端,React"))
+            mockMvc.perform(get("/jobs").session(listSession).param("roles", "前端,React"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", hasSize(1)))
                     .andExpect(jsonPath("$.content[0].company").value("FrontendJob"));
@@ -181,7 +195,7 @@ class JobControllerTest {
             oldJob.setUpdatedAt(LocalDateTime.now());
             jobRepository.saveAndFlush(oldJob);
 
-            mockMvc.perform(get("/jobs").param("onlyNewToday", "true"))
+            mockMvc.perform(get("/jobs").session(listSession).param("onlyNewToday", "true"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", hasSize(1)))
                     .andExpect(jsonPath("$.content[0].company").value("TodayCo"))
@@ -194,7 +208,7 @@ class JobControllerTest {
             for (int i = 0; i < 5; i++) {
                 saveJob("Company" + i, "互联网", "秋招");
             }
-            mockMvc.perform(get("/jobs").param("page", "1").param("size", "2"))
+            mockMvc.perform(get("/jobs").session(listSession).param("page", "1").param("size", "2"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", hasSize(2)))
                     .andExpect(jsonPath("$.totalElements").value(5))

@@ -30,6 +30,9 @@ public class User {
     @Column(name = "query_count_reset_at")
     private LocalDate queryCountResetAt;
 
+    @Column(name = "bonus_queries", nullable = false, columnDefinition = "int not null default 0")
+    private Integer bonusQueries = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -61,6 +64,8 @@ public class User {
     public void setQueryCount(Integer queryCount) { this.queryCount = queryCount; }
     public LocalDate getQueryCountResetAt() { return queryCountResetAt; }
     public void setQueryCountResetAt(LocalDate queryCountResetAt) { this.queryCountResetAt = queryCountResetAt; }
+    public Integer getBonusQueries() { return bonusQueries; }
+    public void setBonusQueries(Integer bonusQueries) { this.bonusQueries = bonusQueries != null ? bonusQueries : 0; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

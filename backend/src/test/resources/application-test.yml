@@ -18,9 +18,10 @@ spring:
   session:
     store-type: none
 
-# 测试环境不设 context-path，MockMvc 直接请求 /jobs
+# 测试环境不设 context-path，MockMvc 直接请求 /jobs；不自动开通体验会员
 app:
   max-free-queries: 3
+  trial-vip-days: 0
 
 # 微信登录与支付：stub 模式下 code 即 openid，支付不调真实接口
 wechat:

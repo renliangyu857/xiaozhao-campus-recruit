@@ -17,9 +17,11 @@ import java.util.Map;
 public class JobController {
 
     private final JobService jobService;
+    private final AuthService authService;
 
-    public JobController(JobService jobService) {
+    public JobController(JobService jobService, AuthService authService) {
         this.jobService = jobService;
+        this.authService = authService;
     }
 
     @GetMapping

@@ -28,6 +28,7 @@ server:
   servlet:
     context-path: /api
 
-# 免费查询每日次数
+# 免费查询每日次数；新用户体验VIP天数（0表示不自动开通）
 app:
   max-free-queries: 3
+  trial-vip-days: 2

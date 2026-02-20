@@ -1,8 +1,12 @@
 import { apiFetch } from './apiClient';
-import { VipPlan } from '../types';
+import { VipPlan, VipDashboard } from '../types';
 
 export function getVipPlans(): Promise<VipPlan[]> {
   return apiFetch<VipPlan[]>('/vip/plans');
+}
+
+export function getVipDashboard(): Promise<VipDashboard> {
+  return apiFetch<VipDashboard>('/vip/dashboard');
 }
 
 export interface CreateOrderResponse {

@@ -46,9 +46,19 @@ export interface User {
   nickname: string;
   avatar: string;
   isVip: boolean;
+  isTrial?: boolean;
   vipExpiry?: string;
   queryCount: number; // To track free usage
   remainingFreeQueries?: number; // 后端返回，VIP 时可能不存在/为空
+}
+
+export interface VipDashboard {
+  isVip: boolean;
+  planId?: string;
+  isTrial?: boolean;
+  vipExpiry?: string;
+  referralCodeCount: number;
+  savedQueryCount: number;
 }
 
 export interface FilterState {
