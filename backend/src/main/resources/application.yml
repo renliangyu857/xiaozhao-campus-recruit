@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: campusrecruit-backend
+  datasource:
+    url: jdbc:mysql://localhost:3306/campusrecruit?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  session:
+    store-type: redis
+  profiles:
+    active: supabase,upstash
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+# 免费查询每日次数
+app:
+  max-free-queries: 3

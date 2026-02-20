@@ -1,0 +1,13 @@
+# 使用 Upstash Redis 时的配置（可选）
+# 启动方式：
+#   SPRING_PROFILES_ACTIVE=upstash
+# 或
+#   mvn spring-boot:run -Dspring-boot.run.profiles=upstash
+#
+# 推荐：用一条 URL（TLS）：UPSTASH_REDIS_URL=rediss://default:<password>@<endpoint>:6379
+spring:
+  data:
+    redis:
+      url: "rediss://default:AX9xAAIncDJhOTE3YzZiYzcwZjY0YTJmOTlkYTVlZjFkYjI3N2NhNnAyMzI2MjU@suitable-salmon-32625.upstash.io:6379"
+  session:
+    store-type: redis
