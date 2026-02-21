@@ -5,7 +5,8 @@ import { JobCard } from '../components/JobCard';
 import { fetchJobsPage, PageResult } from '../services/jobService';
 import { consumeQuery } from '../services/queryService';
 import { ApiError } from '../services/apiClient';
-import { Search, Filter, Lock, Sparkles, X, MapPin, Briefcase, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, Lock, Sparkles, X, MapPin, Briefcase, Calendar, ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { getFavoriteJobIds, toggleFavoriteJobId } from '../services/favoriteService';
 import { useNavigate } from 'react-router-dom';
 
 interface HomePageProps {
@@ -27,12 +28,23 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onUpdateQueryCount, jo
     roles: '',
   });
   const [onlyNewToday, setOnlyNewToday] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize] = useState(30);
   const [pageResult, setPageResult] = useState<PageResult<Job> | null>(null);
   const [displayJobs, setDisplayJobs] = useState<Job[]>(jobs);
   const [showPaywall, setShowPaywall] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // 收藏列表：按用户从 localStorage 加载
+  useEffect(() => {
+    if (!user?.id) {
+      setFavoriteIds(new Set());
+      return;
+    }
+    setFavoriteIds(getFavoriteJobIds(user.id));
+  }, [user?.id]);
 
   // Initial load - 仅当用户已登录且有数据时才显示
   useEffect(() => {
@@ -44,13 +56,22 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onUpdateQueryCount, jo
     }
   }, [jobs, user]);
 
-  const loadPage = async (page: number, resetPage: boolean = false) => {
+  const handleToggleFavorite = (jobId: string) => {
+    if (!user?.id) return;
+    const next = toggleFavoriteJobId(user.id, jobId);
+    setFavoriteIds(next);
+  };
+
+  const listToShow = showFavoritesOnly ? displayJobs.filter((j) => favoriteIds.has(j.id)) : displayJobs;
+
+  const loadPage = async (page: number, resetPage: boolean = false, onlyNewTodayOverride?: boolean) => {
     // 检查登录状态
     if (!user) {
       alert('请先登录后操作');
       return;
     }
 
+    const useOnlyNewToday = onlyNewTodayOverride !== undefined ? onlyNewTodayOverride : onlyNewToday;
     setShowPaywall(false);
     setLoading(true);
     try {
@@ -72,7 +93,7 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onUpdateQueryCount, jo
         }
       }
 
-      const result = await fetchJobsPage(filters, onlyNewToday, page, pageSize);
+      const result = await fetchJobsPage(filters, useOnlyNewToday, page, pageSize);
       setPageResult(result);
       setDisplayJobs(result.content || []);
       setCurrentPage(result.number);
@@ -197,7 +218,22 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onUpdateQueryCount, jo
                  
                  <div className="flex items-center justify-between md:justify-end gap-3">
                      <button 
-                        onClick={() => setOnlyNewToday(!onlyNewToday)}
+                        onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                        className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all flex items-center gap-1.5 ${
+                            showFavoritesOnly 
+                            ? 'bg-amber-50 border-amber-200 text-amber-600 shadow-sm' 
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                     >
+                        <Star size={14} className={showFavoritesOnly ? 'fill-current' : ''} />
+                        我的收藏
+                     </button>
+                     <button 
+                        onClick={() => {
+                          const next = !onlyNewToday;
+                          setOnlyNewToday(next);
+                          if (user) loadPage(0, true, next);
+                        }}
                         className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all flex items-center gap-1.5 ${
                             onlyNewToday 
                             ? 'bg-red-50 border-red-200 text-red-600 shadow-sm' 
@@ -229,10 +265,12 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onUpdateQueryCount, jo
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="space-y-4">
              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900 tracking-tight">最新职位</h2>
+                <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+                  {showFavoritesOnly ? '我的收藏' : '最新职位'}
+                </h2>
                 {pageResult && (
                   <span className="text-xs font-medium text-slate-500 bg-white px-2 py-1 rounded-md border border-slate-100">
-                      共找到 {pageResult.totalElements} 条
+                      {showFavoritesOnly ? `共 ${listToShow.length} 条` : `共找到 ${pageResult.totalElements} 条`}
                   </span>
                 )}
              </div>
@@ -276,9 +314,21 @@ export const HomePage: React.FC<HomePageProps> = ({ user, onUpdateQueryCount, jo
             {/* 职位列表 */}
             {displayJobs.length > 0 && (
               <div className="grid grid-cols-1 gap-4">
-                {displayJobs.map(job => (
-                  <JobCard key={job.id} job={job} onStatusChange={onUpdateJobStatus} />
-                ))}
+                {listToShow.length === 0 && showFavoritesOnly ? (
+                  <div className="bg-white rounded-2xl border border-slate-100 p-8 text-center text-slate-500">
+                    当前页暂无收藏，点击职位卡片上的星标可收藏
+                  </div>
+                ) : (
+                  listToShow.map(job => (
+                    <JobCard
+                      key={job.id}
+                      job={job}
+                      onStatusChange={onUpdateJobStatus}
+                      isFavorite={favoriteIds.has(job.id)}
+                      onToggleFavorite={user ? handleToggleFavorite : undefined}
+                    />
+                  ))
+                )}
               </div>
             )}
 

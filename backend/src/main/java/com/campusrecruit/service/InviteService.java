@@ -16,11 +16,14 @@ import java.util.Random;
 @Service
 public class InviteService {
 
-    private static final int REWARD_QUERIES = 3;
-    private static final int TIER2_COUNT = 3;
-    private static final int TIER2_VIP_DAYS = 5;
-    private static final int TIER3_COUNT = 10;
-    private static final int TIER3_VIP_DAYS = 30;
+    /** 前 5 人：每邀请 1 人邀请人获得的 VIP 天数 */
+    private static final int VIP_DAYS_FIRST_5 = 2;
+    /** 第 6 人起：每邀请 1 人邀请人获得的 VIP 天数 */
+    private static final int VIP_DAYS_AFTER_5 = 4;
+    /** 邀请人通过邀请获得的 VIP 天数上限（1 个月） */
+    private static final int INVITER_VIP_CAP_DAYS = 30;
+    /** 被邀请人：获得的 VIP 天数 */
+    private static final int INVITEE_VIP_DAYS = 2;
 
     private final UserInvitationRepository invitationRepository;
     private final UserRepository userRepository;
@@ -73,23 +76,14 @@ public class InviteService {
         inv.setRewardStatus("completed");
         invitationRepository.save(inv);
 
-        User inviter = userRepository.findById(inv.getInviterId()).orElse(null);
-        User invitee = userRepository.findById(inviteeUserId).orElse(null);
-        if (inviter != null) {
-            inviter.setBonusQueries((inviter.getBonusQueries() != null ? inviter.getBonusQueries() : 0) + REWARD_QUERIES);
-            userRepository.save(inviter);
-        }
-        if (invitee != null) {
-            invitee.setBonusQueries((invitee.getBonusQueries() != null ? invitee.getBonusQueries() : 0) + REWARD_QUERIES);
-            userRepository.save(invitee);
-        }
-
         long totalInvited = invitationRepository.countByInviterIdAndInviteeIdIsNotNull(inv.getInviterId());
-        if (totalInvited >= TIER3_COUNT) {
-            authService.grantVipDays(inv.getInviterId(), TIER3_VIP_DAYS, "promo");
-        } else if (totalInvited >= TIER2_COUNT) {
-            authService.grantVipDays(inv.getInviterId(), TIER2_VIP_DAYS, "promo");
+        // 邀请人：前 5 人每人 2 天，第 6 人起每人 4 天，最高 30 天
+        int inviterDays = totalInvited <= 5 ? VIP_DAYS_FIRST_5 : (totalInvited <= 10 ? VIP_DAYS_AFTER_5 : 0);
+        if (inviterDays > 0) {
+            authService.grantVipDays(inv.getInviterId(), inviterDays, "promo");
         }
+        // 被邀请人：得 2 天 VIP
+        authService.grantVipDays(inviteeUserId, INVITEE_VIP_DAYS, "invitee_trial");
         return Optional.of("ok");
     }
 
@@ -97,11 +91,10 @@ public class InviteService {
         if (userId == null) return Map.of("totalInvited", 0, "rewards", List.of(), "inviteCode", "");
         long total = invitationRepository.countByInviterIdAndInviteeIdIsNotNull(userId);
         List<String> rewards = new ArrayList<>();
-        rewards.add("每邀请 1 人，双方各得 " + REWARD_QUERIES + " 次免费查询");
-        if (total >= TIER2_COUNT) rewards.add("已邀请 " + TIER2_COUNT + " 人，已获得 " + TIER2_VIP_DAYS + " 天 VIP");
-        else rewards.add("邀请 " + TIER2_COUNT + " 人可获 " + TIER2_VIP_DAYS + " 天 VIP");
-        if (total >= TIER3_COUNT) rewards.add("已邀请 " + TIER3_COUNT + " 人，已获得 " + TIER3_VIP_DAYS + " 天 VIP");
-        else rewards.add("邀请 " + TIER3_COUNT + " 人可获 " + TIER3_VIP_DAYS + " 天 VIP");
+        rewards.add("前 5 人每人得 " + VIP_DAYS_FIRST_5 + " 天 VIP，第 6 人起每人 " + VIP_DAYS_AFTER_5 + " 天，最高 1 个月 VIP");
+        if (total >= 10) rewards.add("已邀请 10 人，已达最高 1 个月 VIP");
+        else if (total >= 5) rewards.add("已邀请 " + total + " 人，再邀 " + (10 - total) + " 人可拿满 1 个月");
+        else rewards.add("已邀请 " + total + " 人，前 5 人每人 2 天，之后每人 4 天");
         String inviteCode = getOrCreateInviteCode(userId);
         return Map.of("totalInvited", total, "rewards", rewards, "inviteCode", inviteCode);
     }

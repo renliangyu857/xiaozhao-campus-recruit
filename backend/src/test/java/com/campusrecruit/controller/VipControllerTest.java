@@ -31,7 +31,8 @@ class VipControllerTest {
                 .andExpect(jsonPath("$[0].durationLabel").value("1个月"))
                 .andExpect(jsonPath("$[0].price").value(8.8))
                 .andExpect(jsonPath("$[1].id").value("3_month"))
-                .andExpect(jsonPath("$[1].price").value(18.8))
+                .andExpect(jsonPath("$[1].price").value(16.6))
+                .andExpect(jsonPath("$[1].tag").value("超值推荐"))
                 .andExpect(jsonPath("$[2].id").value("lifetime"))
                 .andExpect(jsonPath("$[2].price").value(29.9));
     }

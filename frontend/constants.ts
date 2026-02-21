@@ -111,31 +111,11 @@ export const MOCK_JOBS: Job[] = [
   }
 ];
 
+/** 仅作兜底，实际价位以 GET /vip/plans 接口下发为准 */
 export const VIP_PLANS: VipPlan[] = [
-  {
-    id: '1_month',
-    name: '月度会员',
-    durationLabel: '1个月',
-    price: 8.8,
-    originalPrice: 19.9,
-    tag: '尝鲜'
-  },
-  {
-    id: '3_month',
-    name: '季度会员',
-    durationLabel: '3个月',
-    price: 18.8,
-    originalPrice: 49.9,
-    tag: '推荐'
-  },
-  {
-    id: 'lifetime',
-    name: '永久会员',
-    durationLabel: '永久',
-    price: 29.9,
-    originalPrice: 99.9,
-    tag: '超值'
-  }
+  { id: '1_month', name: '月度会员', durationLabel: '1个月', price: 8.8, originalPrice: 19.9, tag: '尝鲜' },
+  { id: '3_month', name: '季度会员', durationLabel: '3个月', price: 16.6, originalPrice: 49.9, tag: '超值推荐' },
+  { id: 'lifetime', name: '永久会员', durationLabel: '永久', price: 29.9, originalPrice: 99.9, tag: '超值' },
 ];
 
 export const MAX_FREE_QUERIES = 3;

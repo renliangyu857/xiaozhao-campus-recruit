@@ -1,27 +1,29 @@
-# Findings & Decisions
+# Findings: 权益对比看板 + 滚动展示
 
-## Requirements
-- 用户登录后若有查询权限则自动加载职位数据（当前未自动加载）
-- 邀请码：6位大写字母+数字组成的唯一编码
-- 邀请页面名：改为「邀请有礼」
-- 邀请页图标：礼物相关图标
+## 权益与套餐对应
+- **1个月**: 无限查询、进度看板、职位收藏、内推码库、专属社群
+- **3个月**: 以上全部 + 个性化推送（关注公司和职位后，岗位上新后通过公众号个性化推送）、解锁全部笔面试资料
+- **永久**: 3个月全部 + 无敌性价比
 
-## Research Findings
-- App.tsx: jobs state + fetchJobsPage; handleLogin had commented preload. HomePage loadPage consumes query when !isVip && resetPage.
-- Auto-load: call fetchJobsPage(defaultFilters, false, 0, 30) after setUser in both getCurrentUser useEffect and handleLogin; setJobs(result.content). No consume on this preload.
-- InviteService: generate() used UUID 0,16; getOrCreateInviteCode uses generate. Added 6-char A-Z+0-9 with existsByInviteCode uniqueness loop.
-- NavBar: 邀请 + UserPlus → 邀请有礼 + Gift. InvitePage: badge 邀请有礼 + Gift, title "邀请有礼 · 免费领 VIP".
+## 专属权益（需图标突显）
+- 个性化推送：仅 3个月、永久
+- 解锁全部笔面试资料：仅 3个月、永久
+- 无敌性价比：仅 永久
 
-## Technical Decisions
-| Decision | Rationale |
-|----------|-----------|
-| (filled as we go) | |
+## 技术
+- 沿用现有 `getVipPlans()`、`createVipOrder`、`handleUpgrade`，计划顺序固定为 1_month、3_month、lifetime
+- 表格：第一列为权益名称（可带注释小字），后三列为各套餐单元格（✓ 或文案），表头为套餐名+每日价+总价+购买按钮
 
-## Issues Encountered
-| Issue | Resolution |
-|-------|------------|
-| | |
+## 滚动展示
+- 邀请页：buildInviteTickerMessages() 生成 30 条，用户名 mpweixin***，奖励规则为前5人每人2天、第6人起每人4天、最高1个月，打乱后每 3s 切换
+- 会员页：buildVipTickerMessages() 仅两种类型（用户*** 已购买 1/3个月/永久会员、用户*** 已投递 50–300 家职位抢占先机），30 条打乱，已去掉「已有 N 用户购买 VIP」
 
-## Resources
-- frontend: App.tsx (login flow), HomePage (jobs load), invite/InvitePage
-- backend: InviteService (generate code), UserInvitationRepository
+## 邀请奖励（当前）
+- 前 5 人：邀请人每邀 1 人得 2 天 VIP；第 6–10 人：每邀 1 人得 4 天；上限 30 天（1 个月）。被邀请人固定 2 天。后端 InviteService 已同步，无需再改。
+
+## 会员价位
+- 通过 GET /vip/plans 接口下发；后端 VipPlanService 使用 VipPlanProperties 读取 app.vip.plans（application.yml），未配置项用代码默认值。3个月默认 16.6 元、标签「超值推荐」。
+- 会员页权益对比看板：3 个月列默认作为推荐展示——表头显示 tag（超值推荐）橙色角标、该列橙色边框与浅琥珀背景、购买按钮为琥珀色，与截图一致。
+
+## 招聘列表收藏
+- 前端实现：favoriteService 用 localStorage 存每用户收藏的 job id 集合（key: campusrecruit_favorites_${userId}）。JobCard 右上角星标可切换收藏；HomePage 有「我的收藏」按钮，打开后列表仅显示当前页中已收藏的职位，标题改为「我的收藏」、条数显示收藏数。

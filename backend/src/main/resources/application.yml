@@ -32,3 +32,18 @@ server:
 app:
   max-free-queries: 3
   trial-vip-days: 2
+  # 会员套餐价位与标签，可通过此处或环境变量调整，由 GET /vip/plans 接口下发
+  vip:
+    plans:
+      # 1_month:
+      #   price: 8.8
+      #   originalPrice: 19.9
+      #   tag: 尝鲜
+      # 3_month: 默认 16.6 / 超值推荐，可覆盖
+      #   price: 16.6
+      #   originalPrice: 49.9
+      #   tag: 超值推荐
+      # lifetime:
+      #   price: 29.9
+      #   originalPrice: 99.9
+      #   tag: 超值

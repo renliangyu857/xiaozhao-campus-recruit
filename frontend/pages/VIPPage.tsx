@@ -1,34 +1,53 @@
 import React, { useEffect, useState } from 'react';
 import { User, VipPlan } from '../types';
-import { Crown, Zap, Award, FileText, Shield, Star, MessageCircle } from 'lucide-react';
+import { Crown, Check, Bell, BookOpen, Sparkles } from 'lucide-react';
 import { getVipPlans, getVipDashboard, createVipOrder } from '../services/vipService';
 import { ApiError } from '../services/apiClient';
 
-const MOCK_PAYMENT_TICKER = [
-  { avatar: '', message: '用户 *** 刚刚开通了季度会员' },
-  { avatar: '', message: '用户 *** 刚刚开通了永久会员' },
-  { avatar: '', message: '已有 1000+ 同学升级 VIP' },
-];
+/** 会员页滚动：某某用户已购买X会员 / 已投递N家职位抢占先机；30 条随机生成后打乱 */
+function buildVipTickerMessages(): string[] {
+  const plans = ['1个月会员', '3个月会员', '永久会员'];
+  const messages: string[] = [];
+  for (let i = 0; i < 30; i++) {
+    const type = Math.floor(Math.random() * 2);
+    if (type === 0) {
+      messages.push(`用户*** 已购买 ${plans[Math.floor(Math.random() * plans.length)]}`);
+    } else {
+      const count = 50 + Math.floor(Math.random() * 251);
+      messages.push(`用户*** 已投递 ${count} 家职位，抢占先机`);
+    }
+  }
+  return messages.sort(() => Math.random() - 0.5);
+}
+
+const VIP_TICKER_MESSAGES = buildVipTickerMessages();
 
 interface VIPPageProps {
   user: User | null;
   onUpgrade: (planId: string) => void;
 }
 
-const benefits = [
-  { icon: <Zap className="w-5 h-5 text-amber-500" />, title: '无限次查询', desc: '每日节省 30+ 次查询费用' },
-  { icon: <Award className="w-5 h-5 text-amber-500" />, title: '内推码库', desc: '解锁 500+ 热门公司内推码' },
-  { icon: <FileText className="w-5 h-5 text-amber-500" />, title: 'AI 简历诊断', desc: '深度优化简历，提升通过率' },
-  { icon: <Star className="w-5 h-5 text-amber-500" />, title: '投递进度看板', desc: '可视化记录笔试面试进度' },
-  { icon: <Shield className="w-5 h-5 text-amber-500" />, title: '优先推送', desc: '新职位第一时间通知' },
-  { icon: <MessageCircle className="w-5 h-5 text-amber-500" />, title: '专属社群', desc: '加入 VIP 求职交流群' },
+/** 权益对比看板：每行权益 + 哪些套餐包含（1_month | 3_month | lifetime）；exclusive 表示该权益为高 tier 专属，用图标突显 */
+const BENEFIT_ROWS: { id: string; label: string; note?: string; plans: ('1_month' | '3_month' | 'lifetime')[]; exclusive?: boolean }[] = [
+  { id: 'query', label: '无限查询', plans: ['1_month', '3_month', 'lifetime'] },
+  { id: 'board', label: '进度看板', plans: ['1_month', '3_month', 'lifetime'] },
+  { id: 'collect', label: '职位收藏', plans: ['1_month', '3_month', 'lifetime'] },
+  { id: 'referral', label: '内推码库', plans: ['1_month', '3_month', 'lifetime'] },
+  { id: 'community', label: '专属社群', plans: ['1_month', '3_month', 'lifetime'] },
+  { id: 'push', label: '个性化推送', note: '关注公司和职位后，岗位上新后通过公众号个性化推送', plans: ['3_month', 'lifetime'], exclusive: true },
+  { id: 'material', label: '解锁全部笔面试资料', plans: ['3_month', 'lifetime'], exclusive: true },
+  { id: 'value', label: '无敌性价比', plans: ['lifetime'], exclusive: true },
 ];
+
+const PLAN_ORDER: ('1_month' | '3_month' | 'lifetime')[] = ['1_month', '3_month', 'lifetime'];
+
+const getPlanDays = (planId: string): number | null =>
+  planId === '1_month' ? 30 : planId === '3_month' ? 90 : null;
 
 export const VIPPage: React.FC<VIPPageProps> = ({ user, onUpgrade }) => {
   const [plans, setPlans] = useState<VipPlan[]>([]);
   const [dashboard, setDashboard] = useState<{ isTrial?: boolean; referralCodeCount?: number } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<string>('3_month');
   const [tickerIndex, setTickerIndex] = useState(0);
 
   useEffect(() => {
@@ -37,7 +56,6 @@ export const VIPPage: React.FC<VIPPageProps> = ({ user, onUpgrade }) => {
       try {
         const list = await getVipPlans();
         setPlans(list);
-        if (list.length && !list.some((p) => p.id === selectedPlan)) setSelectedPlan(list[0].id);
       } catch (e) {
         console.error(e);
       } finally {
@@ -53,17 +71,17 @@ export const VIPPage: React.FC<VIPPageProps> = ({ user, onUpgrade }) => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTickerIndex((prev) => (prev + 1) % MOCK_PAYMENT_TICKER.length);
+      setTickerIndex((prev) => (prev + 1) % VIP_TICKER_MESSAGES.length);
     }, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  const handleUpgrade = () => {
+  const handleUpgrade = (planId: string) => {
     if (!user) {
       alert('请先登录');
       return;
     }
-    const plan = plans.find((p) => p.id === selectedPlan);
+    const plan = plans.find((p) => p.id === planId);
     if (!plan) return;
     const confirm = window.confirm(`确认支付 ¥${plan.price} 开通 ${plan.name}？（开发模式：后端返回 stub 下单参数）`);
     if (!confirm) return;
@@ -82,9 +100,9 @@ export const VIPPage: React.FC<VIPPageProps> = ({ user, onUpgrade }) => {
     <div className="min-h-screen bg-slate-50 pt-20 pb-12 px-4 sm:px-6 lg:px-8">
       {/* Ticker */}
       <div className="fixed top-16 left-0 right-0 bg-amber-50 border-b border-amber-100 py-2 overflow-hidden z-40">
-        <div className="flex justify-center items-center gap-2 animate-pulse">
+        <div className="flex justify-center items-center gap-2">
           <span className="text-xs font-medium text-amber-800">
-            {MOCK_PAYMENT_TICKER[tickerIndex].message}
+            {VIP_TICKER_MESSAGES[tickerIndex]}
           </span>
         </div>
       </div>
@@ -127,97 +145,86 @@ export const VIPPage: React.FC<VIPPageProps> = ({ user, onUpgrade }) => {
           </div>
         )}
 
-        {/* 非 VIP：权益 + 定价 */}
-        {!user?.isVip && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
-            <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-              <h3 className="text-xl font-bold text-slate-900 mb-6">会员专属权益</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {benefits.map((benefit, index) => (
-                  <div
-                    key={index}
-                    className="flex items-start gap-4 p-4 rounded-xl bg-slate-50 hover:bg-amber-50/50 transition-colors border border-transparent hover:border-amber-100"
-                  >
-                    <div className="bg-white p-2 rounded-lg shadow-sm border border-slate-100">{benefit.icon}</div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm">{benefit.title}</h4>
-                      <p className="text-xs text-slate-500 mt-1">{benefit.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-xl border border-amber-100 p-6 relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-amber-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
-                限时特惠
-              </div>
-              <div className="space-y-4 mb-8">
-                {(plans.length ? plans : []).map((plan) => (
-                  <div
-                    key={plan.id}
-                    onClick={() => setSelectedPlan(plan.id)}
-                    className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      selectedPlan === plan.id
-                        ? 'border-amber-500 bg-amber-50/30 shadow-md scale-[1.02]'
-                        : 'border-slate-100 hover:border-amber-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    {plan.tag && (
-                      <span
-                        className={`absolute -top-2.5 left-4 px-2 py-0.5 rounded text-[10px] font-bold text-white ${
-                          selectedPlan === plan.id ? 'bg-amber-500' : 'bg-slate-400'
-                        }`}
+        {/* 权益对比看板 */}
+        <div className="mb-16 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
+          <h2 className="sr-only">会员权益对比</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-900 text-white">
+                  <th className="w-48 px-4 py-4 text-sm font-semibold text-slate-200">权益</th>
+                  {PLAN_ORDER.map((planId) => {
+                    const plan = plans.find((p) => p.id === planId);
+                    if (!plan) return <th key={planId} className="px-4 py-4" />;
+                    const days = getPlanDays(plan.id);
+                    const dailyStr = days != null ? `¥${(plan.price / days).toFixed(2)}/天` : '永久';
+                    const totalStr = days != null ? `¥${plan.price}/${days}天` : `¥${plan.price}/永久`;
+                    const isRecommended = plan.id === '3_month';
+                    return (
+                      <th
+                        key={plan.id}
+                        className={`px-4 py-4 text-center ${isRecommended ? 'relative border-2 border-amber-400 bg-slate-800 shadow-lg shadow-amber-500/20' : ''}`}
                       >
-                        {plan.tag}
-                      </span>
-                    )}
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h4 className={`font-bold ${selectedPlan === plan.id ? 'text-slate-900' : 'text-slate-600'}`}>
-                          {plan.name}
-                        </h4>
-                        <p className="text-xs text-slate-400 mt-0.5">{plan.durationLabel}</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-sm font-bold text-amber-600">¥</span>
-                          <span className="text-2xl font-bold text-amber-600">{plan.price}</span>
+                        {plan.tag && (
+                          <span
+                            className={`inline-block mb-2 rounded px-2 py-0.5 text-[10px] font-bold ${isRecommended ? 'bg-amber-500 text-white' : 'bg-slate-600 text-slate-200'}`}
+                          >
+                            {plan.tag}
+                          </span>
+                        )}
+                        <div className="font-bold text-white">{plan.name}</div>
+                        <div className="mt-1 text-xs text-slate-300">{dailyStr}</div>
+                        <div className="text-xs text-slate-400">{totalStr}</div>
+                        <button
+                          type="button"
+                          onClick={() => handleUpgrade(plan.id)}
+                          disabled={loading}
+                          className={`mt-3 w-full max-w-[100px] rounded-lg px-3 py-2 text-sm font-medium shadow disabled:opacity-50 ${isRecommended ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-white text-slate-900 hover:bg-slate-100'}`}
+                        >
+                          {user?.isVip ? '升级' : '购买'}
+                        </button>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {BENEFIT_ROWS.map((row) => (
+                  <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        {row.exclusive && (
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600" title="该套餐专属权益">
+                            {row.id === 'push' && <Bell className="h-3.5 w-3.5" />}
+                            {row.id === 'material' && <BookOpen className="h-3.5 w-3.5" />}
+                            {row.id === 'value' && <Sparkles className="h-3.5 w-3.5" />}
+                          </span>
+                        )}
+                        <div>
+                          <span className="font-medium text-slate-800">{row.label}</span>
+                          {row.note && <p className="mt-0.5 text-xs text-slate-500">{row.note}</p>}
                         </div>
-                        <div className="text-xs text-slate-400 line-through">¥{plan.originalPrice}</div>
                       </div>
-                    </div>
-                  </div>
+                    </td>
+                    {PLAN_ORDER.map((planId) => (
+                      <td key={planId} className={`px-4 py-3 text-center ${planId === '3_month' ? 'bg-amber-50/40' : ''}`}>
+                        {row.plans.includes(planId) ? (
+                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                            <Check className="h-4 w-4" strokeWidth={2.5} />
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-              </div>
-              <button
-                onClick={handleUpgrade}
-                disabled={loading || !plans.length}
-                className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <Crown size={20} className="fill-white/20" />
-                立即开通会员
-              </button>
-              <p className="text-center text-xs text-slate-400 mt-4">支付即代表同意《会员服务协议》</p>
-            </div>
+              </tbody>
+            </table>
           </div>
-        )}
-
-        {/* 底部功能简述（所有用户可见） */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <h3 className="font-bold text-slate-900 mb-2">极速信息聚合</h3>
-            <p className="text-slate-500 text-sm">全网校招信息实时同步，把握黄金投递期。</p>
-          </div>
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <h3 className="font-bold text-slate-900 mb-2">进度一目了然</h3>
-            <p className="text-slate-500 text-sm">可视化投递漏斗，记录笔试面试，提升转化率。</p>
-          </div>
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <h3 className="font-bold text-slate-900 mb-2">优质内推资源</h3>
-            <p className="text-slate-500 text-sm">会员专属内推码库，直达面试官。</p>
-          </div>
+          <p className="border-t border-slate-100 px-4 py-3 text-center text-xs text-slate-400">支付即代表同意《会员服务协议》</p>
         </div>
+
       </div>
     </div>
   );

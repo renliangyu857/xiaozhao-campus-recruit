@@ -1,13 +1,15 @@
 import React from 'react';
 import { ApplyStatus, Job } from '../types';
-import { MapPin, Calendar, CreditCard, ExternalLink, ChevronDown } from 'lucide-react';
+import { MapPin, Calendar, ExternalLink, ChevronDown, Star } from 'lucide-react';
 
 interface JobCardProps {
   job: Job;
   onStatusChange: (id: string, status: ApplyStatus) => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (jobId: string) => void;
 }
 
-export const JobCard: React.FC<JobCardProps> = ({ job, onStatusChange }) => {
+export const JobCard: React.FC<JobCardProps> = ({ job, onStatusChange, isFavorite, onToggleFavorite }) => {
   const getStatusColor = (status: ApplyStatus) => {
     switch (status) {
       case ApplyStatus.NOT_APPLIED: return 'bg-slate-100 text-slate-500 border-slate-200';
@@ -29,6 +31,17 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onStatusChange }) => {
             NEW
           </div>
         </div>
+      )}
+      {/* 收藏 */}
+      {onToggleFavorite && (
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); onToggleFavorite(job.id); }}
+          className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-amber-500 transition-colors"
+          title={isFavorite ? '取消收藏' : '收藏'}
+        >
+          <Star size={18} className={isFavorite ? 'fill-amber-500 text-amber-500' : ''} />
+        </button>
       )}
 
       <div className="flex flex-col gap-4">
