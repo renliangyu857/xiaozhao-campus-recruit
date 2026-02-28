@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AppUser {
+  id                BigInt    @id @default(autoincrement())
+  openId            String    @unique @map("open_id") @db.VarChar(64)
+  unionId           String?   @map("union_id") @db.VarChar(64)
+  nickname          String?   @db.VarChar(64)
+  avatar            String?   @db.VarChar(512)
+  queryCount        Int       @default(0) @map("query_count")
+  queryCountResetAt DateTime? @map("query_count_reset_at") @db.Date
+  bonusQueries      Int       @default(0) @map("bonus_queries")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@map("app_user")
+}
+
+model Job {
+  id               BigInt   @id @default(autoincrement())
+  company          String  @db.VarChar(128)
+  industry         String  @db.VarChar(32)
+  recruitType      String  @map("recruit_type") @db.VarChar(32)
+  locations        String? @db.VarChar(512)
+  startDate        String? @map("start_date") @db.VarChar(32)
+  endDate          String? @map("end_date") @db.VarChar(32)
+  noWrittenTest    String  @default("false") @map("no_written_test") @db.VarChar(16)
+  roles            String? @db.VarChar(512)
+  announcementLink String? @map("announcement_link") @db.VarChar(512)
+  applyLink        String? @map("apply_link") @db.VarChar(512)
+  remark           String? @db.VarChar(1024)
+  batch            String? @db.VarChar(8)
+  salary           String? @db.VarChar(64)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([industry])
+  @@index([recruitType])
+  @@index([endDate])
+  @@index([createdAt])
+  @@index([industry, recruitType, createdAt(sort: Desc)])
+  @@map("job")
+}
+
+model UserJobStatus {
+  id        BigInt   @id @default(autoincrement())
+  userId    BigInt   @map("user_id")
+  jobId     BigInt   @map("job_id")
+  status    String   @db.VarChar(32)
+  note      String?  @db.VarChar(1024)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, jobId])
+  @@index([userId])
+  @@index([jobId])
+  @@map("user_job_status")
+}
+
+model UserMember {
+  id        BigInt   @id @default(autoincrement())
+  userId    BigInt   @map("user_id")
+  planId    String   @map("plan_id") @db.VarChar(32)
+  startAt   DateTime @map("start_at")
+  endAt     DateTime @map("end_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("user_member")
+}
+
+model UserInvitation {
+  id           BigInt   @id @default(autoincrement())
+  inviterId    BigInt   @map("inviter_id")
+  inviteeId    BigInt?  @map("invitee_id")
+  inviteCode   String   @unique @map("invite_code") @db.VarChar(64)
+  rewardStatus String   @default("pending") @map("reward_status") @db.VarChar(32)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([inviterId])
+  @@index([inviteeId])
+  @@map("user_invitation")
+}
+
+model ReferralCode {
+  id            BigInt   @id @default(autoincrement())
+  companyName   String   @map("company_name") @db.VarChar(128)
+  code          String   @db.VarChar(128)
+  contributorId BigInt?  @map("contributor_id")
+  usageCount    Int      @default(0) @map("usage_count")
+  isValid       Boolean  @default(true) @map("is_valid")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([companyName])
+  @@index([isValid])
+  @@map("referral_code")
+}
