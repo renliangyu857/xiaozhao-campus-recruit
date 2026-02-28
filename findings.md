@@ -1,29 +1,85 @@
-# Findings: 权益对比看板 + 滚动展示
+# Findings & Decisions
 
-## 权益与套餐对应
-- **1个月**: 无限查询、进度看板、职位收藏、内推码库、专属社群
-- **3个月**: 以上全部 + 个性化推送（关注公司和职位后，岗位上新后通过公众号个性化推送）、解锁全部笔面试资料
-- **永久**: 3个月全部 + 无敌性价比
+## Requirements
 
-## 专属权益（需图标突显）
-- 个性化推送：仅 3个月、永久
-- 解锁全部笔面试资料：仅 3个月、永久
-- 无敌性价比：仅 永久
+- 参考 [求职方舟 - 笔试真题汇总表](https://www.qiuzhifangzhou.com/exam?table=exam) 的展示与交互方式。
+- 在网页中支持对指定百度网盘目录的**搜索、查询、展示**。
+- 目标网盘目录：
+  - 名称：全网最全笔面试资料
+  - 链接: https://pan.baidu.com/s/1_udWahpE9WUwA3xT_Il2XQ?pwd=yjdf
+  - 提取码: yjdf
 
-## 技术
-- 沿用现有 `getVipPlans()`、`createVipOrder`、`handleUpgrade`，计划顺序固定为 1_month、3_month、lifetime
-- 表格：第一列为权益名称（可带注释小字），后三列为各套餐单元格（✓ 或文案），表头为套餐名+每日价+总价+购买按钮
+## Research Findings
 
-## 滚动展示
-- 邀请页：buildInviteTickerMessages() 生成 30 条，用户名 mpweixin***，奖励规则为前5人每人2天、第6人起每人4天、最高1个月，打乱后每 3s 切换
-- 会员页：buildVipTickerMessages() 仅两种类型（用户*** 已购买 1/3个月/永久会员、用户*** 已投递 50–300 家职位抢占先机），30 条打乱，已去掉「已有 N 用户购买 VIP」
+- **参考站 exam 页**：标题为「笔试真题汇总表-大厂笔试面试真题汇总」，页面含「使用兑换码」等交互；具体表格列与数据结构需进一步查看（当前 fetch 仅得到部分片段）。
+- **百度网盘分享目录获取**：
+  - 官方开放平台 API 需用户授权，不直接支持「仅凭分享链接列出目录」。
+  - 存在第三方免费 API（如通过 shareid/uk 等参数获取列表），但非官方、稳定性无保障。
+  - 可行方案：**(1)** 使用第三方 API 实时拉取（有失效风险）；**(2)** 人工/脚本在浏览器或油猴导出目录清单，后端或前端维护 JSON/表结构，本站只做搜索与展示；(3) 后端定时爬取并缓存目录（法律与 ToS 需自行评估）。
 
-## 邀请奖励（当前）
-- 前 5 人：邀请人每邀 1 人得 2 天 VIP；第 6–10 人：每邀 1 人得 4 天；上限 30 天（1 个月）。被邀请人固定 2 天。后端 InviteService 已同步，无需再改。
+## Technical Decisions
 
-## 会员价位
-- 通过 GET /vip/plans 接口下发；后端 VipPlanService 使用 VipPlanProperties 读取 app.vip.plans（application.yml），未配置项用代码默认值。3个月默认 16.6 元、标签「超值推荐」。
-- 会员页权益对比看板：3 个月列默认作为推荐展示——表头显示 tag（超值推荐）橙色角标、该列橙色边框与浅琥珀背景、购买按钮为琥珀色，与截图一致。
+| Decision | Rationale |
+|----------|-----------|
+| 数据来源：静态 JSON 清单 | 百度网盘无公开「仅凭分享链接列目录」API；第三方 API 不稳定。先维护一份网盘目录 JSON（可人工或脚本从油猴等导出后更新），本站做搜索与展示。 |
+| 前端路由：/exam | 与参考站 exam 表意一致，便于用户理解。 |
+| 展示内容 | 表格列：文件名、分类/目录、格式、大小（可选）、操作（打开网盘链接 + 展示提取码）。 |
 
-## 招聘列表收藏
-- 前端实现：favoriteService 用 localStorage 存每用户收藏的 job id 集合（key: campusrecruit_favorites_${userId}）。JobCard 右上角星标可切换收藏；HomePage 有「我的收藏」按钮，打开后列表仅显示当前页中已收藏的职位，标题改为「我的收藏」、条数显示收藏数。
+## Issues Encountered
+
+| Issue | Resolution |
+|-------|------------|
+| （暂无） | |
+
+## Resources
+
+- 参考页: https://www.qiuzhifangzhou.com/exam?table=exam
+- 网盘分享: https://pan.baidu.com/s/1_udWahpE9WUwA3xT_Il2XQ?pwd=yjdf 提取码: yjdf
+- 项目技术栈: 前端 React + Vite；后端 Java + Spring Boot（见 技术实现方案.md）
+
+## Visual/Browser Findings
+
+- 求职方舟 exam 页包含「笔试真题汇总表」标题、兑换码弹窗；完整表格列与数据格式需打开实际页面确认。
+
+---
+
+## E2E 测试结论（next-app 完整跑结果）
+
+- **总用例数**：126（chromium UI+API + api 项目）
+- **通过**：绝大部分 API 用例通过；部分 UI 用例失败。
+- **失败用例**：
+  - **01-home**（3 个）：行业/地点/类型+截止筛选后点击「查询筛选」——未登录时 `loadPage` 直接 `alert("请先登录后操作")` 并 return，不会请求 `/jobs`，页面始终显示「请先登录后查询职位」或「选择筛选条件后，点击「查询筛选」按钮查看职位信息」，不会出现 `job-card` 或「暂无相关职位」，导致 10s 内等不到目标元素。
+  - **02-auth-quota**（1 个）：付费弹层点击「立即开通会员」后跳转会员页，断言 `toHaveURL(/\/(vip|vip\/?)$/)` 或 `getByText(/升级会员|尊贵的 VIP|升级 VIP/)` 超时（约 30s），可能为客户端导航或会员页加载/水合慢。
+  - **03-pages**（2 个）：① 未登录时点击「进度」进入进度页，页面显示「请先登录」而非「我的投递看板」，用例却只断言 heading「我的投递看板」；② 从会员页点击「招聘列表」返回首页，断言 URL 或「最新职位」可能因导航/加载慢或选择器不稳定而超时。
+  - **99-api-full**（1 个）：完整流程「注册→登录→查询职位→…」为 API 请求测试，12.2s 失败，可能为某一步 status/body 断言或超时。
+- **跳过**：03-pages「登录后首页若有职位可切换投递状态下拉框」在无职位时 skip。
+
+---
+
+## 前端响应速度慢 — 定位结论
+
+### 1. API 延迟（主要观感）
+
+- **/api/jobs**：E2E 中单次请求普遍 **2–4s**（含 Supabase 冷连接、Prisma findMany + count + userJobStatus 三路查询）。本地对远程 DB 时 2–4s 属常见范围。
+- **/api/progress/stats**、**/api/vip/dashboard** 等：登录后首请也在 **2–4s**，同样受 DB 与 session 校验影响。
+- **无服务端缓存**：每次筛选都重新查库，无 Redis/内存缓存。
+
+### 2. 前端串行请求放大延迟
+
+- **首页「查询筛选」**（`app/page.tsx` 的 `loadPage`）：
+  - 若用户非 VIP：先 **POST /query/consume**，再 **getCurrentUser()**（GET /auth/current），再 **fetchJobsPage()**（GET /jobs）。
+  - 三次串行往返，总耗时 ≈ 单次 2–4s × 3 = **6–12s**，与「点击后很久才出结果」一致。
+- 未对「当前用户」做短期缓存，每次操作都可能重复拉 current。
+
+### 3. 渲染与体验
+
+- 列表区在请求完成前无 skeleton，仅按钮变为「查询中…」，用户易误以为卡死。
+- 无请求去抖/节流，快速连续点击会多次触发 loadPage。
+
+### 4. 改进建议（写入 findings 供后续实施）
+
+| 方向 | 建议 |
+|------|------|
+| 接口 | 为 /jobs、/progress/stats 等加短期服务端缓存（如 30s）或 edge cache；或合并 consume + getCurrentUser + jobs 为单次 BFF 调用减少往返。 |
+| 前端 | 对 getCurrentUser 做短期缓存（如 1 分钟），避免每次查询都打两次 2–4s 请求；首屏或筛选时先出 skeleton 再替换为列表。 |
+| 测试 | 01-home 筛选用例改为先登录再筛选，或断言未登录时的占位文案；03-pages 进度页未登录时断言「请先登录」；02 付费弹层可适当延长超时或等待 networkidle 后再断言。 |
