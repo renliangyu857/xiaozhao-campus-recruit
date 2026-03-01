@@ -44,3 +44,21 @@ Thumbs.db
 # Crawl / temp data
 crawl/
 ~$*
+
+# Next.js specific
+/out/
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# Yarn
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Coverage
+/coverage
