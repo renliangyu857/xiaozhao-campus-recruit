@@ -12,7 +12,7 @@
     "e2e:api": "playwright test --config=playwright.api.config.ts",
     "db:push": "dotenv -e .env.local -- prisma db push",
     "db:migrate": "dotenv -e .env.local -- prisma migrate deploy",
-    "postinstall": "prisma generate || echo 'Prisma generate skipped'"
+    "postinstall": "prisma generate"
   },
   "engines": {
     "node": ">=20.0.0"
