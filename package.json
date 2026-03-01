@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "dotenv -e .env.local -- prisma generate && dotenv -e .env.local -- next build",
+    "build:prod": "dotenv -e .env.production -- prisma generate && dotenv -e .env.production -- next build",
     "start": "next start",
     "lint": "eslint",
     "e2e": "playwright test",
