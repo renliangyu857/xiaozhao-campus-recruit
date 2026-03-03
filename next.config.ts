@@ -10,6 +10,21 @@ const nextConfig: NextConfig = {
   images: {
     formats: ['image/webp', 'image/avif'],
     minimumCacheTTL: 60,
+    // 远程图片域名配置（用于服务号二维码等）
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.qpic.cn',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.weixin.qq.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
   },
 
   // 实验性功能优化

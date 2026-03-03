@@ -8,9 +8,10 @@ import {
   getWechatUserInfo,
   parseState,
   WECHAT_CONFIG,
+  getWechatAccessToken,
+  getUserSubscribeStatus,
 } from "@/lib/wechat";
 import {
-  getLoginTicket,
   markTicketSuccess,
   markTicketScanned,
 } from "@/lib/wechatTicket";
@@ -94,6 +95,23 @@ export async function GET(request: NextRequest) {
     });
     let isNewUser = false;
 
+    // 5. 检查用户是否已关注服务号
+    let isSubscribed = user?.isSubscribed ?? false;
+
+    // 如果是新用户，或者老用户但还未关注，检查关注状态
+    if (!user || !user.isSubscribed) {
+      try {
+        // 获取微信公众号 access_token
+        const mpAccessToken = await getWechatAccessToken();
+        // 查询用户关注状态
+        isSubscribed = await getUserSubscribeStatus(mpAccessToken, openid);
+      } catch (error) {
+        console.error("[WechatCallback] Failed to check subscribe status:", error);
+        // 如果检查失败，默认允许登录（避免阻塞）
+        isSubscribed = true;
+      }
+    }
+
     if (!user) {
       // 新用户：创建记录
       user = await prisma.appUser.create({
@@ -103,16 +121,26 @@ export async function GET(request: NextRequest) {
           nickname: nickname || `微信用户_${openid.slice(-6)}`,
           avatar: avatar,
           queryCount: 0,
+          isSubscribed,
+          ...(isSubscribed && { subscribedAt: new Date() }),
         },
       });
       isNewUser = true;
-      logger.info("auth_user_created", { userId: String(user.id), openid });
+      logger.info("auth_user_created", { userId: String(user.id), openid, isSubscribed });
     } else {
-      // 老用户：更新信息
-      const updateData: { nickname?: string; avatar?: string; unionId?: string } = {};
+      // 老用户：更新信息和关注状态
+      const updateData: { nickname?: string; avatar?: string; unionId?: string; isSubscribed?: boolean; subscribedAt?: Date } = {};
       if (nickname && !user.nickname) updateData.nickname = nickname;
       if (avatar && !user.avatar) updateData.avatar = avatar;
       if (unionid && !user.unionId) updateData.unionId = unionid;
+
+      // 如果关注状态有变化，更新关注状态
+      if (isSubscribed !== user.isSubscribed) {
+        updateData.isSubscribed = isSubscribed;
+        if (isSubscribed && !user.subscribedAt) {
+          updateData.subscribedAt = new Date();
+        }
+      }
 
       if (Object.keys(updateData).length > 0) {
         user = await prisma.appUser.update({
@@ -122,7 +150,31 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 5. 新用户赠送 2 天 VIP 体验
+    // 6. 如果用户未关注服务号，跳转到关注提示页面
+    if (!isSubscribed) {
+      logger.info("auth_user_not_subscribed", { openid, ticket: state?.ticket });
+
+      // 如果是 PC 扫码登录，保留 ticket 信息
+      if (state?.ticket) {
+        await markTicketScanned(state.ticket, openid);
+        return NextResponse.redirect(
+          new URL(
+            `/auth/subscribe?ticket=${state.ticket}`,
+            WECHAT_CONFIG.CALLBACK_URL
+          ).href
+        );
+      }
+
+      // H5 登录未关注，也跳转到关注页面
+      return NextResponse.redirect(
+        new URL(
+          `/auth/subscribe`,
+          WECHAT_CONFIG.CALLBACK_URL
+        ).href
+      );
+    }
+
+    // 7. 新用户赠送 2 天 VIP 体验
     if (isNewUser) {
       const trialStart = new Date();
       const trialEnd = new Date(trialStart.getTime() + 2 * 24 * 60 * 60 * 1000);
@@ -140,7 +192,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 6. 如果是 PC 扫码登录，标记票据成功并跳转成功页
+    // 8. 如果是 PC 扫码登录，标记票据成功并跳转成功页
     if (state?.ticket) {
       await markTicketSuccess(state.ticket, String(user.id));
       // PC 端扫码后，在手机上显示登录成功页面
@@ -154,7 +206,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 7. H5 登录：设置 session 并跳转回前端
+    // 9. H5 登录：设置 session 并跳转回前端
     await setSessionUserId(Number(user.id));
     await invalidateAuthCurrentCache(Number(user.id));
 
@@ -162,6 +214,7 @@ export async function GET(request: NextRequest) {
       userId: String(user.id),
       isNewUser,
       mode: "h5",
+      isSubscribed,
     });
 
     // 构建跳转 URL

@@ -196,6 +196,49 @@ export function parseState(stateStr: string): AuthState | null {
 }
 
 /**
+ * 获取微信公众号 access_token（用于调用其他 API）
+ */
+export async function getWechatAccessToken(): Promise<string> {
+  const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${WECHAT_CONFIG.APP_ID}&secret=${WECHAT_CONFIG.APP_SECRET}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (data.errcode) {
+    throw new Error(`获取 access_token 失败: ${data.errmsg}`);
+  }
+
+  return data.access_token;
+}
+
+/**
+ * 获取用户关注状态（是否已关注公众号）
+ * 需要调用微信公众号的获取用户基本信息接口
+ */
+export async function getUserSubscribeStatus(
+  accessToken: string,
+  openid: string
+): Promise<boolean> {
+  try {
+    const url = `https://api.weixin.qq.com/cgi-bin/user/info?access_token=${accessToken}&openid=${openid}&lang=zh_CN`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.errcode) {
+      console.error("[WechatSubscribe] Failed to get user info:", data);
+      return false;
+    }
+
+    // subscribe: 用户是否订阅该公众号标识，值为0时，代表此用户没有关注该公众号
+    return data.subscribe === 1;
+  } catch (error) {
+    console.error("[WechatSubscribe] Error checking subscribe status:", error);
+    return false;
+  }
+}
+
+/**
  * 检查是否在微信浏览器内
  */
 export function isWechatBrowser(userAgent: string): boolean {

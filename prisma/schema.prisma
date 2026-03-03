@@ -9,16 +9,18 @@ datasource db {
 }
 
 model AppUser {
-  id                BigInt    @id @default(autoincrement())
-  openId            String    @unique @map("open_id") @db.VarChar(64)
-  unionId           String?   @map("union_id") @db.VarChar(64)
-  nickname          String?   @db.VarChar(64)
-  avatar            String?   @db.VarChar(512)
-  queryCount        Int       @default(0) @map("query_count")
-  queryCountResetAt DateTime? @map("query_count_reset_at") @db.Date
-  bonusQueries      Int       @default(0) @map("bonus_queries")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id                  BigInt    @id @default(autoincrement())
+  openId              String    @unique @map("open_id") @db.VarChar(64)
+  unionId             String?   @map("union_id") @db.VarChar(64)
+  nickname            String?   @db.VarChar(64)
+  avatar              String?   @db.VarChar(512)
+  queryCount          Int       @default(0) @map("query_count")
+  queryCountResetAt   DateTime? @map("query_count_reset_at") @db.Date
+  bonusQueries        Int       @default(0) @map("bonus_queries")
+  isSubscribed        Boolean   @default(false) @map("is_subscribed")
+  subscribedAt        DateTime? @map("subscribed_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
   @@map("app_user")
 }

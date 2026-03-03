@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/authService";
 import { ApiError } from "@/lib/apiClient";
 import { useUser } from "@/components/UserContext";
 import { clearUserCache } from "@/lib/authService";
+import { PaymentSuccessModal } from "@/components/PaymentSuccessModal";
 import type { VipPlan, VipDashboard } from "@/lib/types";
 
 function buildVipTickerMessages(): string[] {
@@ -94,6 +95,11 @@ export default function VIPPage() {
   const [tickerIndex, setTickerIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
 
+  // 购买成功弹窗状态
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [purchasedPlanName, setPurchasedPlanName] = useState("");
+  const [purchasedExpiryDate, setPurchasedExpiryDate] = useState("");
+
   useEffect(() => {
     setMounted(true);
     getVipPlans().then(setPlans).catch(console.error);
@@ -117,18 +123,26 @@ export default function VIPPage() {
     }
     const plan = plans.find((p) => p.id === planId);
     if (!plan) return;
-    if (!window.confirm(`确认支付 ¥${plan.price} 开通 ${plan.name}？（开发模式：后端返回 stub 下单参数）`)) return;
+    if (!window.confirm(`确认支付 ¥${plan.price} 开通 ${plan.name}？`)) return;
     setLoading(true);
     try {
-      const order = await createVipOrder(plan.id);
-      alert(`已创建订单：${order.orderNo ?? order.orderId ?? "—"}\n（开发模式需模拟支付回调）`);
+      await createVipOrder(plan.id);
+
+      // 刷新用户信息以获取最新的VIP状态
       clearUserCache();
       const u = await getCurrentUser();
       setUser(u);
+
+      // 获取仪表盘信息
       if (u.isVip) {
         const d = await getVipDashboard();
         setDashboard({ isTrial: d.isTrial, referralCodeCount: d.referralCodeCount });
       }
+
+      // 显示购买成功弹窗
+      setPurchasedPlanName(plan.name);
+      setPurchasedExpiryDate(u.vipExpiry ?? "");
+      setShowSuccessModal(true);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) alert("请先登录");
       else alert(((e as ApiError)?.body as { message?: string })?.message ?? (e as Error)?.message ?? "下单失败");
@@ -398,6 +412,22 @@ export default function VIPPage() {
           </p>
         </div>
       </div>
+
+      {/* 购买成功弹窗 */}
+      <PaymentSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        planName={purchasedPlanName}
+        expiryDate={purchasedExpiryDate}
+        onExperience={() => {
+          // 可以跳转到某个功能页面，如投递进度管理
+          window.location.href = "/progress";
+        }}
+        onViewBenefits={() => {
+          // 滚动到权益对比表格
+          document.querySelector("table")?.scrollIntoView({ behavior: "smooth" });
+        }}
+      />
     </div>
   );
 }
