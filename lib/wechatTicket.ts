@@ -26,10 +26,17 @@ export interface LoginTicket {
 }
 
 // 优先使用 Upstash Redis，否则使用内存存储（仅开发环境）
-const redis = process.env.UPSTASH_REDIS_URL
+// 注意：@upstash/redis 需要 REST API URL（https://开头），不是 redis:// 连接字符串
+const redisUrl = process.env.UPSTASH_REDIS_URL || "";
+const redisToken = process.env.UPSTASH_REDIS_TOKEN || "";
+
+// 检查是否是有效的 Upstash REST URL（必须以 https:// 开头）
+const isValidUpstashUrl = redisUrl.startsWith("https://");
+
+const redis = isValidUpstashUrl && redisToken
   ? new Redis({
-      url: process.env.UPSTASH_REDIS_URL,
-      token: process.env.UPSTASH_REDIS_TOKEN || "",
+      url: redisUrl,
+      token: redisToken,
     })
   : null;
 
