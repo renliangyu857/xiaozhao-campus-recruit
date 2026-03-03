@@ -16,12 +16,25 @@ export const WECHAT_CONFIG = {
 // 验证配置是否已设置
 export function validateWechatConfig(): { valid: boolean; missing: string[] } {
   const missing: string[] = [];
-  if (!process.env.WECHAT_APP_ID || process.env.WECHAT_APP_ID === "wxYOUR_APP_ID_HERE") {
+
+  // 检查 WECHAT_CONFIG 中的实际值（已经处理了 process.env 和默认值）
+  const appId = WECHAT_CONFIG.APP_ID;
+  const appSecret = WECHAT_CONFIG.APP_SECRET;
+
+  // 检查是否是默认值或未设置
+  const isDefaultAppId = !appId || appId === "wxYOUR_APP_ID_HERE" || appId.startsWith("wxYOUR_");
+  const isDefaultSecret = !appSecret || appSecret === "YOUR_APP_SECRET_HERE" || appSecret.includes("YOUR_");
+
+  if (isDefaultAppId) {
     missing.push("WECHAT_APP_ID");
+    console.error("[WechatConfig] WECHAT_APP_ID not configured, current value:", appId);
   }
-  if (!process.env.WECHAT_APP_SECRET || process.env.WECHAT_APP_SECRET === "YOUR_APP_SECRET_HERE") {
+
+  if (isDefaultSecret) {
     missing.push("WECHAT_APP_SECRET");
+    console.error("[WechatConfig] WECHAT_APP_SECRET not configured");
   }
+
   return { valid: missing.length === 0, missing };
 }
 
