@@ -21,10 +21,12 @@
   "dependencies": {
     "@prisma/client": "^6.19.2",
     "@sentry/nextjs": "^10.40.0",
+    "@upstash/redis": "^1.36.3",
     "ioredis": "^5.9.3",
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
     "prisma": "^6.19.2",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0"

@@ -30,6 +30,15 @@ export function clearUserCache(): void {
   cacheExpiry = 0;
 }
 
+/** 开发模式：模拟登录（用于配置未完成时） */
+export function mockWechatLogin(code: string): Promise<User> {
+  const encoded = encodeURIComponent(code);
+  return apiFetch<User>(`/auth/wechat/login?code=${encoded}`).then((u) => {
+    clearUserCache();
+    return u;
+  });
+}
+
 export function wechatLogin(code: string): Promise<User> {
   const encoded = encodeURIComponent(code);
   return apiFetch<User>(`/auth/wechat/login?code=${encoded}`).then((u) => {
