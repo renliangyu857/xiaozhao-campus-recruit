@@ -28,6 +28,17 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const stateStr = searchParams.get("state");
 
+  // 打印完整请求信息用于调试
+  console.log("[WechatCallback] Received request:", {
+    fullUrl: request.url,
+    code: code ? "present" : "missing",
+    state: stateStr,
+    headers: {
+      host: request.headers.get("host"),
+      "user-agent": request.headers.get("user-agent")?.slice(0, 50),
+    },
+  });
+
   // 解析 state
   const state = stateStr ? parseState(stateStr) : null;
   const redirectPath = state?.redirectPath || "/";
@@ -35,6 +46,14 @@ export async function GET(request: NextRequest) {
   // 错误处理：用户拒绝授权
   if (!code) {
     logger.warn("wechat_callback_no_code", { state: stateStr });
+    // 检查是否是微信返回的错误
+    const error = searchParams.get("error");
+    const errorDescription = searchParams.get("error_description");
+    console.error("[WechatCallback] WeChat returned error:", {
+      error,
+      errorDescription,
+      allParams: Object.fromEntries(searchParams.entries()),
+    });
     return NextResponse.redirect(
       new URL(`${redirectPath}?error=access_denied`, WECHAT_CONFIG.CALLBACK_URL)
         .href

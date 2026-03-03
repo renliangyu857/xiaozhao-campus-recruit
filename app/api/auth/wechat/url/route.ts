@@ -49,6 +49,12 @@ export async function GET(request: NextRequest) {
     // 生成授权 URL
     const authUrl = generateAuthUrl({ redirectPath, ticket });
 
+    console.log("[WechatUrl] Generated auth URL:", {
+      mode: loginMode,
+      ticket,
+      authUrl: authUrl.slice(0, 200) + "...",
+    });
+
     logger.info("wechat_auth_url_generated", {
       mode: loginMode,
       hasTicket: !!ticket,

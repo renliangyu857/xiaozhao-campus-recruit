@@ -24,7 +24,10 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
   if (redis) {
     try {
       const v = await redis.get(key);
-      return v ? (JSON.parse(v) as T) : null;
+      if (!v) return null;
+      // 兼容 ioredis 返回 string，或其他库返回已解析的对象
+      if (typeof v === "string") return JSON.parse(v) as T;
+      return v as T;
     } catch {
       // Redis 不可用时降级到内存缓存
     }

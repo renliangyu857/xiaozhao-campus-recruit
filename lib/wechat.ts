@@ -93,18 +93,28 @@ export function generateAuthUrl(params: {
   };
 
   const stateStr = Buffer.from(JSON.stringify(state)).toString("base64url");
-  const redirectUri = encodeURIComponent(WECHAT_CONFIG.CALLBACK_URL);
+  const rawRedirectUri = WECHAT_CONFIG.CALLBACK_URL;
+  const redirectUri = encodeURIComponent(rawRedirectUri);
   const scope = "snsapi_userinfo"; // 获取用户昵称和头像
 
-  return (
+  const authUrl =
     `https://open.weixin.qq.com/connect/oauth2/authorize` +
     `?appid=${WECHAT_CONFIG.APP_ID}` +
     `&redirect_uri=${redirectUri}` +
     `&response_type=code` +
     `&scope=${scope}` +
     `&state=${encodeURIComponent(stateStr)}` +
-    `#wechat_redirect`
-  );
+    `#wechat_redirect`;
+
+  // 打印调试日志
+  console.log("[WechatAuth] Generated auth URL:", {
+    rawRedirectUri,
+    encodedRedirectUri: redirectUri,
+    appId: WECHAT_CONFIG.APP_ID,
+    fullUrl: authUrl,
+  });
+
+  return authUrl;
 }
 
 /**
@@ -120,10 +130,30 @@ export async function exchangeCodeForToken(
     `&code=${code}` +
     `&grant_type=authorization_code`;
 
+  console.log("[WechatToken] Exchanging code for token:", {
+    appId: WECHAT_CONFIG.APP_ID,
+    code: code.slice(0, 10) + "...",
+    requestUrl: url.replace(WECHAT_CONFIG.APP_SECRET, "***SECRET***"),
+  });
+
   const res = await fetch(url);
-  const data: WechatTokenResponse = await res.json();
+  const rawText = await res.text();
+
+  console.log("[WechatToken] Raw response:", rawText);
+
+  let data: WechatTokenResponse;
+  try {
+    data = JSON.parse(rawText);
+  } catch (e) {
+    console.error("[WechatToken] Failed to parse response:", e);
+    throw new Error(`微信接口返回非 JSON: ${rawText.slice(0, 200)}`);
+  }
 
   if (data.errcode) {
+    console.error("[WechatToken] WeChat API error:", {
+      errcode: data.errcode,
+      errmsg: data.errmsg,
+    });
     throw new Error(`微信接口错误: ${data.errmsg} (code: ${data.errcode})`);
   }
 

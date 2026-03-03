@@ -8,6 +8,8 @@ declare global {
 export function getRedis(): Redis | null {
   const url = process.env.UPSTASH_REDIS_URL;
   if (!url) return null;
+  // Upstash REST API URL (https://) 不兼容 ioredis，跳过
+  if (url.startsWith("https://")) return null;
   if (globalThis.__campusRecruitRedis !== undefined) return globalThis.__campusRecruitRedis;
 
   const client = new Redis(url, {

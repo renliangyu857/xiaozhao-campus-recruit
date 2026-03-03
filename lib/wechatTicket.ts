@@ -77,7 +77,10 @@ export async function createLoginTicket(): Promise<LoginTicket> {
 export async function getLoginTicket(ticket: string): Promise<LoginTicket | null> {
   if (redis) {
     const data = await redis.get<string>(getKey(ticket));
-    return data ? JSON.parse(data) : null;
+    if (!data) return null;
+    // 兼容返回类型：string 需要解析，对象则直接使用
+    if (typeof data === "string") return JSON.parse(data) as LoginTicket;
+    return data as unknown as LoginTicket;
   }
   return memoryStore.get(ticket) || null;
 }

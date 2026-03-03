@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",
-    "@sentry/nextjs": "^10.40.0",
+    "@sentry/nextjs": "^7.120.4",
     "@upstash/redis": "^1.36.3",
     "ioredis": "^5.9.3",
     "lucide-react": "^0.575.0",
