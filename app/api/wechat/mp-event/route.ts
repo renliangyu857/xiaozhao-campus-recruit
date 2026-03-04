@@ -9,8 +9,7 @@ import { logger } from "@/lib/logger";
 const WECHAT_PROXY_URL = process.env.WECHAT_PROXY_URL || "";
 const WECHAT_PROXY_TOKEN = process.env.WECHAT_PROXY_TOKEN || "";
 
-// 微信公众号配置
-const WECHAT_APP_ID = process.env.WECHAT_APP_ID || "";
+// 应用 URL（用于生成回调地址）
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
 
 // 从环境变量读取微信服务器配置 Token
