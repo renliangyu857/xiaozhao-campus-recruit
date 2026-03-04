@@ -244,3 +244,123 @@ export async function getUserSubscribeStatus(
 export function isWechatBrowser(userAgent: string): boolean {
   return /MicroMessenger/i.test(userAgent);
 }
+
+// ==================== 带参数二维码（扫码关注自动登录）====================
+
+export interface MpQrCodeResponse {
+  ticket: string;
+  expire_seconds: number;
+  url: string;
+}
+
+/**
+ * 生成微信公众号带参数二维码（临时二维码）
+ * 用户扫码关注后，可以通过事件获取 openid
+ *
+ * @param sceneStr 场景值字符串（如登录票据 ticket）
+ * @param expireSeconds 二维码有效期（秒），默认 600 秒（10 分钟）
+ */
+export async function generateMpQrCode(
+  sceneStr: string,
+  expireSeconds = 600
+): Promise<MpQrCodeResponse> {
+  const accessToken = await getWechatAccessToken();
+
+  const url = `https://api.weixin.qq.com/cgi-bin/qrcode/create?access_token=${accessToken}`;
+
+  const body = {
+    expire_seconds: expireSeconds,
+    action_name: "QR_STR_SCENE",
+    action_info: {
+      scene: {
+        scene_str: sceneStr,
+      },
+    },
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const data = await res.json();
+
+  if (data.errcode) {
+    throw new Error(`生成带参数二维码失败: ${data.errmsg} (code: ${data.errcode})`);
+  }
+
+  return {
+    ticket: data.ticket,
+    expire_seconds: data.expire_seconds,
+    url: data.url,
+  };
+}
+
+/**
+ * 获取带参数二维码图片 URL
+ * 用户扫码后会触发关注事件，可以获取 openid
+ */
+export function getMpQrCodeImageUrl(ticket: string): string {
+  return `https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=${encodeURIComponent(ticket)}`;
+}
+
+// ==================== 微信消息/事件处理 ====================
+
+export interface WechatEventMessage {
+  ToUserName: string;
+  FromUserName: string; // 用户的 OpenID
+  CreateTime: number;
+  MsgType: string;
+  Event?: string; // subscribe, unsubscribe, SCAN 等
+  EventKey?: string; // 场景值，如 qrscene_ticket_xxx
+  Ticket?: string; // 二维码的 ticket
+}
+
+/**
+ * 解析微信推送的 XML 消息
+ */
+export function parseWechatXml(xml: string): WechatEventMessage | null {
+  try {
+    const result: Record<string, string> = {};
+    const regex = /<(\w+)><!\[CDATA\[(.*?)\]\]><\/\w+>|<(\w+)>(.*?)<\/\w+>/g;
+    let match;
+
+    while ((match = regex.exec(xml)) !== null) {
+      const key = match[1] || match[3];
+      const value = match[2] || match[4];
+      if (key) {
+        result[key] = value;
+      }
+    }
+
+    return {
+      ToUserName: result.ToUserName || "",
+      FromUserName: result.FromUserName || "",
+      CreateTime: parseInt(result.CreateTime || "0"),
+      MsgType: result.MsgType || "",
+      Event: result.Event,
+      EventKey: result.EventKey,
+      Ticket: result.Ticket,
+    };
+  } catch (error) {
+    console.error("[WechatXml] Failed to parse XML:", error);
+    return null;
+  }
+}
+
+/**
+ * 构建微信被动回复消息（文本）
+ */
+export function buildWechatReply(toUser: string, fromUser: string, content: string): string {
+  const timestamp = Math.floor(Date.now() / 1000);
+  return `
+    <xml>
+      <ToUserName><![CDATA[${toUser}]]></ToUserName>
+      <FromUserName><![CDATA[${fromUser}]]></FromUserName>
+      <CreateTime>${timestamp}</CreateTime>
+      <MsgType><![CDATA[text]]></MsgType>
+      <Content><![CDATA[${content}]]></Content>
+    </xml>
+  `.trim();
+}

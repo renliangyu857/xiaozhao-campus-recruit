@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { QRCodeSVG } from "qrcode.react";
+import Image from "next/image";
 import { X, Smartphone, Loader2, CheckCircle } from "lucide-react";
 import { apiFetch } from "@/lib/apiClient";
 
@@ -13,7 +13,7 @@ interface WechatLoginModalProps {
 
 interface QrCodeData {
   ticket: string;
-  authUrl: string;
+  qrCodeUrl: string; // 公众号带参数二维码图片 URL
   pollUrl: string;
   expiresIn: number;
 }
@@ -132,7 +132,7 @@ export function WechatLoginModal({ isOpen, onClose, onSuccess }: WechatLoginModa
           {/* 标题 */}
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-gray-900">微信登录</h2>
-            <p className="text-gray-500 mt-2">请使用微信扫描二维码登录</p>
+            <p className="text-gray-500 mt-2">请使用微信扫码关注公众号登录</p>
           </div>
 
           {/* 二维码区域 */}
@@ -147,28 +147,22 @@ export function WechatLoginModal({ isOpen, onClose, onSuccess }: WechatLoginModa
               )}
 
               {status === "qr_ready" && qrData && (
-                <>
-                  <QRCodeSVG
-                    value={qrData.authUrl}
-                    size={200}
-                    level="H"
-                    includeMargin={false}
-                    imageSettings={{
-                      src: "/wechat-icon.png",
-                      height: 40,
-                      width: 40,
-                      excavate: true,
-                    }}
+                <div className="relative w-[200px] h-[200px]">
+                  <Image
+                    src={qrData.qrCodeUrl}
+                    alt="微信扫码关注登录"
+                    fill
+                    className="object-contain"
+                    priority
                   />
-                  {/* 如果二维码过期，显示遮罩 */}
-                </>
+                </div>
               )}
 
               {status === "scanned" && (
                 <div className="absolute inset-0 bg-white/95 flex flex-col items-center justify-center">
                   <Smartphone className="w-12 h-12 text-green-500 mb-3" />
-                  <p className="text-gray-700 font-medium">已扫码</p>
-                  <p className="text-sm text-gray-500 mt-1">请在手机上确认登录</p>
+                  <p className="text-gray-700 font-medium">已关注</p>
+                  <p className="text-sm text-gray-500 mt-1">正在登录...</p>
                 </div>
               )}
 
@@ -207,7 +201,7 @@ export function WechatLoginModal({ isOpen, onClose, onSuccess }: WechatLoginModa
             {/* 提示文字 */}
             <div className="mt-6 flex items-center gap-2 text-sm text-gray-500">
               <Smartphone className="w-4 h-4" />
-              <span>打开微信 → 扫一扫 → 确认登录</span>
+              <span>打开微信 → 扫一扫 → 关注公众号</span>
             </div>
 
             {/* 刷新按钮 */}
