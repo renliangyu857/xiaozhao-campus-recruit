@@ -1,12 +1,63 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
-import { parseWechatXml } from "@/lib/wechat";
+import { parseWechatXml, getWechatAccessToken } from "@/lib/wechat";
 import { markTicketSuccess, markTicketScanned } from "@/lib/wechatTicket";
 import { logger } from "@/lib/logger";
 
+// 微信代理服务器配置
+const WECHAT_PROXY_URL = process.env.WECHAT_PROXY_URL || "";
+const WECHAT_PROXY_TOKEN = process.env.WECHAT_PROXY_TOKEN || "";
+
 // 从环境变量读取微信服务器配置 Token
 const WECHAT_MP_TOKEN = process.env.WECHAT_MP_TOKEN || "";
+
+// 微信配置
+const WECHAT_APP_ID = process.env.WECHAT_APP_ID || "";
+const WECHAT_APP_SECRET = process.env.WECHAT_APP_SECRET || "";
+
+/**
+ * 获取微信用户信息（通过代理或直接调用）
+ */
+async function fetchWechatUserInfo(openid: string): Promise<{ nickname?: string; headimgurl?: string } | null> {
+  try {
+    // 如果配置了代理，使用代理获取用户信息
+    if (WECHAT_PROXY_URL && WECHAT_PROXY_TOKEN) {
+      const userRes = await fetch(`${WECHAT_PROXY_URL}/wechat/userinfo?openid=${openid}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${WECHAT_PROXY_TOKEN}` },
+      });
+      const userData = await userRes.json();
+      if (userData.error || !userRes.ok) {
+        console.error("[WechatMP] Failed to get user info from proxy:", userData);
+        return null;
+      }
+      return {
+        nickname: userData.nickname,
+        headimgurl: userData.headimgurl,
+      };
+    }
+
+    // 直接调用微信接口（需要 IP 白名单）
+    const accessToken = await getWechatAccessToken();
+    const url = `https://api.weixin.qq.com/cgi-bin/user/info?access_token=${accessToken}&openid=${openid}&lang=zh_CN`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.errcode) {
+      console.error("[WechatMP] Failed to get user info:", data);
+      return null;
+    }
+
+    return {
+      nickname: data.nickname,
+      headimgurl: data.headimgurl,
+    };
+  } catch (error) {
+    console.error("[WechatMP] Error fetching user info:", error);
+    return null;
+  }
+}
 
 /**
  * 验证微信服务器签名
@@ -136,6 +187,10 @@ async function handleUserSubscribe(
       eventKey,
     });
 
+    // 获取微信用户信息（昵称、头像）
+    const wxUserInfo = await fetchWechatUserInfo(openid);
+    console.log("[WechatMP] Fetched user info:", { openid, hasNickname: !!wxUserInfo?.nickname });
+
     // 查找或创建用户
     let user = await prisma.appUser.findUnique({
       where: { openId: openid },
@@ -144,19 +199,33 @@ async function handleUserSubscribe(
     let isNewUser = false;
 
     if (!user) {
-      // 新用户：创建记录，昵称先用默认值，后续可以更新
+      // 新用户：创建记录，使用微信昵称或默认值
+      const nickname = wxUserInfo?.nickname || `微信用户_${openid.slice(-6)}`;
+      const avatar = wxUserInfo?.headimgurl || null;
       user = await prisma.appUser.create({
         data: {
           openId: openid,
-          nickname: `微信用户_${openid.slice(-6)}`,
+          nickname,
+          avatar,
           queryCount: 0,
           isSubscribed: true,
           subscribedAt: new Date(),
         },
       });
       isNewUser = true;
-      logger.info("mp_user_created", { userId: String(user.id), openid });
+      logger.info("mp_user_created", { userId: String(user.id), openid, nickname });
     } else {
+      // 老用户：更新昵称和头像（如果之前没有）
+      if ((!user.nickname || user.nickname.startsWith("微信用户_")) && wxUserInfo?.nickname) {
+        await prisma.appUser.update({
+          where: { id: user.id },
+          data: {
+            nickname: wxUserInfo.nickname,
+            ...(wxUserInfo.headimgurl && { avatar: wxUserInfo.headimgurl }),
+          },
+        });
+        console.log("[WechatMP] Updated user info:", { userId: user.id, nickname: wxUserInfo.nickname });
+      }
       // 老用户：更新关注状态
       if (!user.isSubscribed) {
         await prisma.appUser.update({
