@@ -93,8 +93,12 @@ export async function POST(request: NextRequest) {
     const { FromUserName: openid, Event, EventKey } = msg;
 
     // 处理关注事件（包括扫码关注）
+    console.log("[WechatMP] Processing event:", { Event, EventKey, openid });
     if (Event === "subscribe" || Event === "SCAN") {
+      console.log("[WechatMP] Handling subscribe/SCAN event");
       await handleUserSubscribe(openid, EventKey);
+    } else {
+      console.log("[WechatMP] Unhandled event type:", Event);
     }
 
     // 返回空响应（或欢迎消息）
@@ -184,14 +188,18 @@ async function handleUserSubscribe(
     }
 
     // 如果有 ticket（PC 端扫码登录），标记登录成功
-    if (ticket && ticket.startsWith("ticket_")) {
+    if (ticket && ticket.startsWith("wlt_")) {
+      console.log("[WechatMP] Marking ticket as success:", { ticket, userId: user.id });
       await markTicketScanned(ticket, openid);
-      await markTicketSuccess(ticket, String(user.id));
+      const success = await markTicketSuccess(ticket, String(user.id));
+      console.log("[WechatMP] Ticket marked:", { ticket, success });
       logger.info("mp_login_success", {
         userId: String(user.id),
         ticket,
         isNewUser,
       });
+    } else {
+      console.log("[WechatMP] No valid ticket found:", { ticket, eventKey });
     }
 
     // 发送欢迎消息给用户

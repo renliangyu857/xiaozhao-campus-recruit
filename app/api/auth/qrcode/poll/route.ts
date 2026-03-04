@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
   }
 
   const ticketData = await getLoginTicket(ticket);
+  console.log("[QrcodePoll] Ticket check:", { ticket, found: !!ticketData, status: ticketData?.status });
 
   if (!ticketData) {
     return NextResponse.json(

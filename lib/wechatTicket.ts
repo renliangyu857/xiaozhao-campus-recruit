@@ -33,12 +33,25 @@ const redisToken = process.env.UPSTASH_REDIS_TOKEN || "";
 // 检查是否是有效的 Upstash REST URL（必须以 https:// 开头）
 const isValidUpstashUrl = redisUrl.startsWith("https://");
 
+console.log("[WechatTicket] Redis config:", {
+  hasUrl: !!redisUrl,
+  hasToken: !!redisToken,
+  isValidUrl: isValidUpstashUrl,
+  urlPrefix: redisUrl.slice(0, 20) + "...",
+});
+
 const redis = isValidUpstashUrl && redisToken
   ? new Redis({
       url: redisUrl,
       token: redisToken,
     })
   : null;
+
+if (redis) {
+  console.log("[WechatTicket] Using Redis for ticket storage");
+} else {
+  console.log("[WechatTicket] Using memory store for ticket storage (Vercel will not work properly!)");
+}
 
 // 内存存储（仅用于开发环境）
 const memoryStore = new Map<string, LoginTicket>();
