@@ -12,10 +12,6 @@ const WECHAT_PROXY_TOKEN = process.env.WECHAT_PROXY_TOKEN || "";
 // 从环境变量读取微信服务器配置 Token
 const WECHAT_MP_TOKEN = process.env.WECHAT_MP_TOKEN || "";
 
-// 微信配置
-const WECHAT_APP_ID = process.env.WECHAT_APP_ID || "";
-const WECHAT_APP_SECRET = process.env.WECHAT_APP_SECRET || "";
-
 /**
  * 获取微信用户信息（通过代理或直接调用）
  */
