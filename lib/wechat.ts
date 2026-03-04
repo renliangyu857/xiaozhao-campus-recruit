@@ -253,8 +253,12 @@ export interface MpQrCodeResponse {
   url: string;
 }
 
+// 微信代理服务器配置（用于解决 IP 白名单问题）
+const WECHAT_PROXY_URL = process.env.WECHAT_PROXY_URL || "";
+const WECHAT_PROXY_TOKEN = process.env.WECHAT_PROXY_TOKEN || "";
+
 /**
- * 生成微信公众号带参数二维码（临时二维码）
+ * 通过代理服务器生成微信公众号带参数二维码
  * 用户扫码关注后，可以通过事件获取 openid
  *
  * @param sceneStr 场景值字符串（如登录票据 ticket）
@@ -264,6 +268,34 @@ export async function generateMpQrCode(
   sceneStr: string,
   expireSeconds = 600
 ): Promise<MpQrCodeResponse> {
+  // 如果配置了代理服务器，使用代理
+  if (WECHAT_PROXY_URL && WECHAT_PROXY_TOKEN) {
+    const res = await fetch(`${WECHAT_PROXY_URL}/wechat/qrcode`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${WECHAT_PROXY_TOKEN}`,
+      },
+      body: JSON.stringify({
+        scene_str: sceneStr,
+        expire_seconds: expireSeconds,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      throw new Error(`代理生成二维码失败: ${data.errmsg || data.error || res.statusText}`);
+    }
+
+    return {
+      ticket: data.ticket,
+      expire_seconds: data.expire_seconds,
+      url: data.url,
+    };
+  }
+
+  // 未配置代理，直接调用微信 API（需要有 IP 白名单）
   const accessToken = await getWechatAccessToken();
 
   const url = `https://api.weixin.qq.com/cgi-bin/qrcode/create?access_token=${accessToken}`;
