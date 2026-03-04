@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLoginTicket, LoginTicketStatus } from "@/lib/wechatTicket";
+import { getLoginTicket } from "@/lib/wechatTicket";
 import { setSessionUserId } from "@/lib/session";
 import { invalidateAuthCurrentCache } from "@/lib/cache";
 

@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Lock, Search, Copy, CheckCircle, Sparkles, Briefcase, Crown } from "lucide-react";
-import { getReferralCodes, useReferralCode, type ReferralCodeItem } from "@/lib/referralCodeService";
+import { Lock, Search, Copy, CheckCircle, Briefcase, Crown } from "lucide-react";
+import { getReferralCodes, applyReferralCode, type ReferralCodeItem } from "@/lib/referralCodeService";
 import { ApiError } from "@/lib/apiClient";
 import { useUser } from "@/components/UserContext";
 
@@ -58,7 +58,7 @@ export default function ReferralCodesPage() {
 
   const handleUse = async (item: ReferralCodeItem) => {
     try {
-      await useReferralCode(item.id);
+      await applyReferralCode(item.id);
       setUsedId(item.id);
       setTimeout(() => setUsedId(null), 2000);
       load();

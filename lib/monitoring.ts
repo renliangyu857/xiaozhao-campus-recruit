@@ -8,7 +8,7 @@ export const monitoring = {
   /**
    * 捕获并上报异常
    */
-  captureException: (error: Error, context?: Record<string, any>) => {
+  captureException: (error: Error, context?: Record<string, unknown>) => {
     Sentry.captureException(error, {
       extra: context,
     });
@@ -38,7 +38,7 @@ export const monitoring = {
   /**
    * 添加面包屑（记录用户操作路径）
    */
-  addBreadcrumb: (message: string, category?: string, data?: Record<string, any>) => {
+  addBreadcrumb: (message: string, category?: string, data?: Record<string, unknown>) => {
     Sentry.addBreadcrumb({
       message,
       category,
@@ -66,7 +66,7 @@ export const monitoring = {
    * 业务事件追踪
    * 用于追踪关键业务节点（支付、注册等）
    */
-  trackBusinessEvent: (eventName: string, data?: Record<string, any>) => {
+  trackBusinessEvent: (eventName: string, data?: Record<string, unknown>) => {
     // 上报到 Sentry
     Sentry.captureMessage(`Business: ${eventName}`, 'info');
 
@@ -97,7 +97,7 @@ export const monitoring = {
   /**
    * 追踪 API 错误
    */
-  trackApiError: (endpoint: string, error: any, requestData?: any) => {
+  trackApiError: (endpoint: string, error: unknown, requestData?: unknown) => {
     Sentry.captureException(error, {
       extra: {
         endpoint,

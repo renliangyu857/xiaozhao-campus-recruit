@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch {
     // 错误会自动被 Sentry 捕获
     return NextResponse.json(
       { error: 'Test error triggered' },

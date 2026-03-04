@@ -37,7 +37,7 @@ export async function loadPanExport(): Promise<PanExportResult> {
         fromExport: true,
       };
     }
-  } catch (_) {}
+  } catch {}
   try {
     const res = await fetch("/pan-export.json", { cache: "no-store" });
     if (res.ok) {
@@ -56,7 +56,7 @@ export async function loadPanExport(): Promise<PanExportResult> {
       const stats = data?.stats ?? DEFAULT_STATS;
       return { items, stats: { ...DEFAULT_STATS, ...stats }, fromExport: true };
     }
-  } catch (_) {}
+  } catch {}
   return { items: [], stats: DEFAULT_STATS, fromExport: false };
 }
 
@@ -68,10 +68,8 @@ function parseBaiduTxtExport(text: string): { path: string; name: string; format
   for (const line of lines) {
     // 查找 ├── 或 └──
     let idx = line.indexOf("├──");
-    let isLastChild = false;
     if (idx === -1) {
       idx = line.indexOf("└──");
-      isLastChild = true;
     }
     if (idx === -1) continue;
     const prefix = line.slice(0, idx);

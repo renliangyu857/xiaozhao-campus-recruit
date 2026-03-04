@@ -4,7 +4,7 @@ import { getRedis } from "./redis";
 type CacheEntry = { value: unknown; expiresAt: number };
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __campusRecruitMemCache: Map<string, CacheEntry> | undefined;
 }
 

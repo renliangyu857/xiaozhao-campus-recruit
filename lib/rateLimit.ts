@@ -6,7 +6,7 @@
 import { getRedis } from "./redis";
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __rateLimitMem: Map<string, { count: number; resetAt: number }> | undefined;
 }
 

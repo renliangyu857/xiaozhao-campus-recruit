@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     try {
       await prisma.$queryRaw`SELECT 1`;
       checks.db = "ok";
-    } catch (e) {
+    } catch {
       checks.db = "error";
       status = 503;
     }

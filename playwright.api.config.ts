@@ -1,7 +1,5 @@
 import { defineConfig } from "@playwright/test";
 
-const apiBase = process.env.E2E_API_BASE ?? "http://localhost:3000/api";
-
 export default defineConfig({
   testDir: "./e2e",
   testMatch: /.*-api-.*\.spec\.ts/,

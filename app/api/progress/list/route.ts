@@ -5,13 +5,6 @@ import { cacheGet, cacheSet, progressListCacheKey } from "@/lib/cache";
 
 const PROGRESS_LIST_TTL = 30;
 
-function parseJsonArray(s: string | null | undefined): string[] {
-  if (!s || !s.trim()) return [];
-  const t = s.trim().replace(/^\[|\]$/g, "").trim();
-  if (!t) return [];
-  return t.split(",").map((x) => x.trim().replace(/^"|"$/g, ""));
-}
-
 export async function GET() {
   let userId: number | null;
   try {

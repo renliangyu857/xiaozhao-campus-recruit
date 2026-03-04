@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { Industry, RecruitType, ApplyStatus } from "@/lib/types";
 import { JobCard } from "@/components/JobCard";
 import { fetchJobsPage, updateJobStatus, type PageResult } from "@/lib/jobService";
-import { consumeQuery } from "@/lib/queryService";
 import { ApiError } from "@/lib/apiClient";
 import { getFavoriteJobIds, toggleFavoriteJobId } from "@/lib/favoriteService";
 import { useUser } from "@/components/UserContext";
@@ -17,7 +16,7 @@ import { useRef } from "react";
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, setUser, onLogin } = useUser();
+  const { user, onLogin } = useUser();
   const [filters, setFilters] = useState<FilterState>({
     industry: "ALL",
     type: "ALL",

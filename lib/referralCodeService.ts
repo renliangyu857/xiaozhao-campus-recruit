@@ -25,6 +25,6 @@ export function getReferralCodes(
   return apiFetch<ReferralCodesPage>(`/referral-codes?${params}`);
 }
 
-export function useReferralCode(id: string): Promise<{ message: string }> {
+export function applyReferralCode(id: string): Promise<{ message: string }> {
   return apiFetch<{ message: string }>(`/referral-codes/${id}/use`, { method: "POST" });
 }

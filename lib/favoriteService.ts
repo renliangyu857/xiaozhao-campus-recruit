@@ -16,7 +16,7 @@ function setFavoriteJobIds(userId: string | number, ids: Set<string>): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY_PREFIX + userId, JSON.stringify([...ids]));
-  } catch (_) {}
+  } catch {}
 }
 
 export function toggleFavoriteJobId(userId: string | number, jobId: string): Set<string> {

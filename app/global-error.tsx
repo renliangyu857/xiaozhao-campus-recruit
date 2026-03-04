@@ -3,6 +3,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
+import Link from 'next/link';
 
 export default function GlobalError({
   error,
@@ -45,12 +46,12 @@ export default function GlobalError({
                 重试
               </button>
 
-              <a
+              <Link
                 href="/"
                 className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 返回首页
-              </a>
+              </Link>
             </div>
 
             {/* 用户反馈按钮 */}
