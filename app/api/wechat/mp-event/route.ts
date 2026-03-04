@@ -5,13 +5,6 @@ import { parseWechatXml, getWechatAccessToken } from "@/lib/wechat";
 import { markTicketSuccess, markTicketScanned } from "@/lib/wechatTicket";
 import { logger } from "@/lib/logger";
 
-// 微信代理服务器配置
-const WECHAT_PROXY_URL = process.env.WECHAT_PROXY_URL || "";
-const WECHAT_PROXY_TOKEN = process.env.WECHAT_PROXY_TOKEN || "";
-
-// 应用 URL（用于生成回调地址）
-const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
-
 // 从环境变量读取微信服务器配置 Token
 const WECHAT_MP_TOKEN = process.env.WECHAT_MP_TOKEN || "";
 
@@ -160,56 +153,6 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * 发送授权链接消息给用户
- * 当公众号接口无法获取用户昵称/头像时，引导用户通过 OAuth 授权
- */
-async function sendAuthLinkMessage(openid: string, ticket: string) {
-  try {
-    // 构建授权 URL（使用 snsapi_userinfo 获取完整用户信息）
-    const authUrl = `${NEXT_PUBLIC_APP_URL}/api/auth/wechat/authorize?ticket=${ticket}`;
-
-    // 获取 access_token
-    let accessToken: string;
-    if (WECHAT_PROXY_URL && WECHAT_PROXY_TOKEN) {
-      const tokenRes = await fetch(`${WECHAT_PROXY_URL}/wechat/token`, {
-        headers: { "Authorization": `Bearer ${WECHAT_PROXY_TOKEN}` },
-      });
-      const tokenData = await tokenRes.json();
-      if (tokenData.error) {
-        console.error("[WechatMP] Failed to get token from proxy:", tokenData);
-        return;
-      }
-      accessToken = tokenData.access_token;
-    } else {
-      accessToken = await getWechatAccessToken();
-    }
-
-    // 发送客服消息
-    const url = `https://api.weixin.qq.com/cgi-bin/message/custom/send?access_token=${accessToken}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        touser: openid,
-        msgtype: "text",
-        text: {
-          content: `欢迎登录！为了获取更好的体验，请点击链接完成授权：\n<a href=\"${authUrl}\">点击授权获取头像昵称</a>`,
-        },
-      }),
-    });
-
-    const data = await res.json();
-    if (data.errcode) {
-      console.error("[WechatMP] Failed to send auth link:", data);
-    } else {
-      console.log("[WechatMP] Auth link sent to user:", { openid });
-    }
-  } catch (error) {
-    console.error("[WechatMP] Error sending auth link:", error);
-  }
-}
-
-/**
  * 处理用户关注/扫码事件，自动完成登录
  */
 async function handleUserSubscribe(
@@ -316,11 +259,6 @@ async function handleUserSubscribe(
         ticket,
         isNewUser,
       });
-
-      // 如果没有获取到用户昵称/头像，发送授权链接让用户授权
-      if (!wxUserInfo?.nickname || !wxUserInfo?.headimgurl) {
-        await sendAuthLinkMessage(openid, ticket);
-      }
     } else {
       console.log("[WechatMP] No valid ticket found:", { ticket, eventKey });
     }
