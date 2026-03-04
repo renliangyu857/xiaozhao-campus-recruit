@@ -1,10 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
-import {
-  parseWechatXml,
-} from "@/lib/wechat";
+import { parseWechatXml } from "@/lib/wechat";
 import { markTicketSuccess, markTicketScanned } from "@/lib/wechatTicket";
 import { logger } from "@/lib/logger";
+
+// 从环境变量读取微信服务器配置 Token
+const WECHAT_MP_TOKEN = process.env.WECHAT_MP_TOKEN || "";
+
+/**
+ * 验证微信服务器签名
+ * 算法：将 token、timestamp、nonce 按字典序排序后拼接，进行 sha1 加密，与 signature 对比
+ */
+function verifyWechatSignature(
+  signature: string,
+  timestamp: string,
+  nonce: string
+): boolean {
+  if (!WECHAT_MP_TOKEN) {
+    console.error("[WechatMP] WECHAT_MP_TOKEN not configured");
+    return false;
+  }
+
+  // 1. 将 token、timestamp、nonce 按字典序排序
+  const sorted = [WECHAT_MP_TOKEN, timestamp, nonce].sort();
+  // 2. 拼接成字符串
+  const str = sorted.join("");
+  // 3. sha1 加密
+  const hash = createHash("sha1").update(str).digest("hex");
+  // 4. 对比 signature
+  return hash === signature;
+}
 
 /**
  * GET /api/wechat/mp-event
@@ -19,15 +45,22 @@ export async function GET(request: NextRequest) {
   const nonce = searchParams.get("nonce") || "";
   const echostr = searchParams.get("echostr") || "";
 
-  // 这里应该进行签名验证，为简化先直接返回 echostr
-  // 生产环境应该使用微信提供的验证算法
   console.log("[WechatMP] Verification request:", {
     signature,
     timestamp,
     nonce,
     echostr,
+    tokenConfigured: !!WECHAT_MP_TOKEN,
   });
 
+  // 验证签名
+  if (!verifyWechatSignature(signature, timestamp, nonce)) {
+    console.error("[WechatMP] Signature verification failed");
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+
+  // 签名验证通过，返回 echostr
+  console.log("[WechatMP] Signature verified, returning echostr");
   return new NextResponse(echostr);
 }
 
@@ -38,6 +71,17 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    // 验证签名
+    const { searchParams } = new URL(request.url);
+    const signature = searchParams.get("signature") || "";
+    const timestamp = searchParams.get("timestamp") || "";
+    const nonce = searchParams.get("nonce") || "";
+
+    if (!verifyWechatSignature(signature, timestamp, nonce)) {
+      console.error("[WechatMP] POST signature verification failed");
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+
     const xml = await request.text();
     console.log("[WechatMP] Received event:", xml);
 
