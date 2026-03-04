@@ -11,6 +11,7 @@ type UserContextType = {
   user: User | null;
   setUser: (u: User | null) => void;
   onLogin: () => void;
+  onLogout: () => Promise<void>;
   isLoginModalOpen: boolean;
   closeLoginModal: () => void;
 };
@@ -94,9 +95,26 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // 退出登录
+  const onLogout = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/logout", { method: "POST" });
+      if (res.ok) {
+        setUser(null);
+        clearUserCache();
+        // 刷新页面以清除所有状态
+        window.location.reload();
+      } else {
+        console.error("退出登录失败");
+      }
+    } catch (error) {
+      console.error("退出登录出错:", error);
+    }
+  }, []);
+
   return (
     <UserContext.Provider
-      value={{ user, setUser, onLogin, isLoginModalOpen, closeLoginModal }}
+      value={{ user, setUser, onLogin, onLogout, isLoginModalOpen, closeLoginModal }}
     >
       {children}
       <WechatLoginModal

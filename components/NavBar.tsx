@@ -2,18 +2,51 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Crown, BarChart3, List, User as UserIcon, KeyRound, Gift, FileText, Cat } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import {
+  Crown,
+  BarChart3,
+  List,
+  User as UserIcon,
+  KeyRound,
+  Gift,
+  FileText,
+  Cat,
+  LogOut,
+  ChevronDown,
+} from "lucide-react";
 import type { User } from "@/lib/types";
 
 interface NavBarProps {
   user: User | null;
   onLogin: () => void;
+  onLogout?: () => Promise<void>;
 }
 
-export function NavBar({ user, onLogin }: NavBarProps) {
+export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
   const pathname = usePathname();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const isActive = (path: string) => pathname === path;
+
+  // 点击外部关闭下拉菜单
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    setIsUserMenuOpen(false);
+    if (onLogout) {
+      await onLogout();
+    }
+  };
 
   return (
     <nav className="fixed w-full top-0 z-50 nav-warm">
@@ -109,11 +142,52 @@ export function NavBar({ user, onLogin }: NavBarProps) {
                     <Crown size={12} className="fill-amber-500 text-amber-500" /> VIP
                   </span>
                 )}
-                <div className="flex items-center gap-3 group cursor-pointer">
-                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#0D7377] to-[#14A085] flex items-center justify-center shadow-lg shadow-teal-200 group-hover:scale-105 transition-transform">
-                    <UserIcon size={20} className="text-white" />
-                  </div>
-                  <span className="text-sm font-semibold text-[#2C3E50] hidden sm:block">{user.nickname}</span>
+                {/* 用户下拉菜单 */}
+                <div className="relative" ref={userMenuRef}>
+                  <button
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    className="flex items-center gap-2 group"
+                  >
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#0D7377] to-[#14A085] flex items-center justify-center shadow-lg shadow-teal-200 group-hover:scale-105 transition-transform">
+                      {user.avatar ? (
+                        <img
+                          src={user.avatar}
+                          alt={user.nickname}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <UserIcon size={20} className="text-white" />
+                      )}
+                    </div>
+                    <span className="text-sm font-semibold text-[#2C3E50] hidden sm:block">
+                      {user.nickname}
+                    </span>
+                    <ChevronDown
+                      size={16}
+                      className={`text-[#5D6D7E] transition-transform duration-200 ${
+                        isUserMenuOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {/* 下拉菜单 */}
+                  {isUserMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-[#E8E8E8] py-2 animate-fade-in-down">
+                      <div className="px-4 py-3 border-b border-[#E8E8E8]/60">
+                        <p className="text-sm font-semibold text-[#2C3E50]">{user.nickname}</p>
+                        <p className="text-xs text-[#95A5A6] mt-0.5">
+                          {user.isVip ? "VIP 会员" : "普通用户"}
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full px-4 py-2.5 text-left text-sm text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5 transition-colors flex items-center gap-2"
+                      >
+                        <LogOut size={16} />
+                        退出登录
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
