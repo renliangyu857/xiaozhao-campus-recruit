@@ -1,0 +1,15 @@
+{
+  "name": "wechat-proxy",
+  "version": "1.0.0",
+  "description": "WeChat API Proxy Server",
+  "main": "wechat-proxy.js",
+  "scripts": {
+    "start": "node wechat-proxy.js",
+    "pm2:start": "pm2 start wechat-proxy.js --name wechat-proxy",
+    "pm2:stop": "pm2 stop wechat-proxy",
+    "pm2:restart": "pm2 restart wechat-proxy"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
