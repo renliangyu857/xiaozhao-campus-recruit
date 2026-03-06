@@ -8,6 +8,10 @@ import { logger } from "@/lib/logger";
 // 从环境变量读取微信服务器配置 Token
 const WECHAT_MP_TOKEN = process.env.WECHAT_MP_TOKEN || "";
 
+// 微信代理服务器配置
+const WECHAT_PROXY_URL = process.env.WECHAT_PROXY_URL || "";
+const WECHAT_PROXY_TOKEN = process.env.WECHAT_PROXY_TOKEN || "";
+
 /**
  * 获取微信用户信息（通过代理或直接调用）
  */
