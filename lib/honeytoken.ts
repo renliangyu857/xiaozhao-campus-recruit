@@ -158,9 +158,9 @@ export function extractInvisibleWatermark(text: string): string | null {
  * @param userId 当前用户ID
  * @param insertPositions 插入位置（默认随机）
  */
-type HoneyJob = typeof HONEY_JOB_TEMPLATES[0] & { id: number };
+type HoneyJob = typeof HONEY_JOB_TEMPLATES[0] & { id: number | string };
 
-export function mixWithHoneyJobs<T extends { id: number }>(
+export function mixWithHoneyJobs<T extends { id: number | string }>(
   realJobs: T[],
   userId: string,
   insertPositions?: number[]
