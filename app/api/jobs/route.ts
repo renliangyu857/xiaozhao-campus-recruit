@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { cacheGet, cacheKey, cacheSet } from "@/lib/cache";
-import { apiProtectionMiddleware, createProtectedResponse } from "@/lib/api-protection";
+import { apiProtectionMiddleware } from "@/lib/api-protection";
 import { mixWithHoneyJobs } from "@/lib/honeytoken";
 
 function parseJsonArray(s: string | null | undefined): string[] {

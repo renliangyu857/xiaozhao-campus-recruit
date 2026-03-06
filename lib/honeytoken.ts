@@ -63,7 +63,7 @@ export function selectHoneyJobs(userId: string, count: number = 1): typeof HONEY
     indices.push(index);
   }
 
-  return indices.map((idx, i) => ({
+  return indices.map((idx) => ({
     ...HONEY_JOB_TEMPLATES[idx],
     // 添加用户专属标记（隐藏在数据中）
     _honey: encodeHoneyMarker(userId, idx),
@@ -158,13 +158,15 @@ export function extractInvisibleWatermark(text: string): string | null {
  * @param userId 当前用户ID
  * @param insertPositions 插入位置（默认随机）
  */
+type HoneyJob = typeof HONEY_JOB_TEMPLATES[0] & { id: number };
+
 export function mixWithHoneyJobs<T extends { id: number }>(
   realJobs: T[],
   userId: string,
   insertPositions?: number[]
-): (T | (typeof HONEY_JOB_TEMPLATES)[0])[] {
+): (T | HoneyJob)[] {
   const honeyJobs = selectHoneyJobs(userId, 1);
-  const result = [...realJobs];
+  const result: (T | HoneyJob)[] = [...realJobs];
 
   // 默认插入到第 3 个位置（不明显但会被抓取）
   const positions = insertPositions || [Math.min(3, realJobs.length)];
@@ -172,11 +174,11 @@ export function mixWithHoneyJobs<T extends { id: number }>(
   honeyJobs.forEach((honey, idx) => {
     const pos = positions[idx] ?? result.length;
     // 创建唯一 ID（负数，便于识别）
-    const uniqueHoney = {
+    const uniqueHoney: HoneyJob = {
       ...honey,
       id: -Math.abs(parseInt(userId.slice(-6)) + idx),
     };
-    result.splice(pos, 0, uniqueHoney as any);
+    result.splice(pos, 0, uniqueHoney);
   });
 
   return result;
