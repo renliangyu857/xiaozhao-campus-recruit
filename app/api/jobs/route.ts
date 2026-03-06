@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { cacheGet, cacheKey, cacheSet } from "@/lib/cache";
+import { apiProtectionMiddleware, createProtectedResponse } from "@/lib/api-protection";
+import { mixWithHoneyJobs } from "@/lib/honeytoken";
 
 function parseJsonArray(s: string | null | undefined): string[] {
   if (!s || !s.trim()) return [];
@@ -15,6 +17,13 @@ export async function GET(request: NextRequest) {
   if (userId == null) {
     return NextResponse.json({ message: "请先登录后操作" }, { status: 401 });
   }
+
+  // API 防护：签名验证 + 频率限制
+  const protection = await apiProtectionMiddleware(request, String(userId));
+  if (!protection.success) {
+    return protection.response;
+  }
+
   const { searchParams } = request.nextUrl;
   const industry = searchParams.get("industry") ?? undefined;
   const type = searchParams.get("type") ?? undefined;
@@ -166,8 +175,11 @@ export async function GET(request: NextRequest) {
     };
   });
 
+  // 混入蜜罐职位（用于溯源）
+  const contentWithHoney = mixWithHoneyJobs(content, String(userId));
+
   return NextResponse.json({
-    content,
+    content: contentWithHoney,
     totalElements,
     totalPages: typeof totalElements === "number" ? Math.ceil(totalElements / size) : null,
     size,

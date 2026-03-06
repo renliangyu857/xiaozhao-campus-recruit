@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { setSessionUserId } from "@/lib/session";
+import { setSessionUserId, setUserApiSecret } from "@/lib/session";
 import { invalidateAuthCurrentCache } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 import {
@@ -208,6 +208,7 @@ export async function GET(request: NextRequest) {
 
     // 9. H5 登录：设置 session 并跳转回前端
     await setSessionUserId(Number(user.id));
+    await setUserApiSecret(Number(user.id));
     await invalidateAuthCurrentCache(Number(user.id));
 
     logger.info("auth_login_success", {

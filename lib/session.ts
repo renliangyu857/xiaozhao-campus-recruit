@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 
 const COOKIE_NAME = "campus_session";
+const API_SECRET_COOKIE = "campus_api_secret";
 const DEV_SECRET = "dev-secret-change-in-production";
 const SECRET = process.env.SESSION_SECRET || DEV_SECRET;
 
@@ -45,4 +46,55 @@ export async function setSessionUserId(userId: number): Promise<void> {
 export async function clearSession(): Promise<void> {
   const c = await cookies();
   c.delete(COOKIE_NAME);
+  c.delete(API_SECRET_COOKIE);
+}
+
+/**
+ * 生成用户的 API 签名密钥
+ * 格式: userId:randomSecret (便于前端解析 userId)
+ */
+function generateApiSecret(userId: number): string {
+  const random = randomBytes(16).toString("hex");
+  return `${userId}:${random}`;
+}
+
+/**
+ * 获取用户的 API 签名密钥
+ */
+export async function getUserApiSecret(): Promise<string | null> {
+  const c = await cookies();
+  return c.get(API_SECRET_COOKIE)?.value || null;
+}
+
+/**
+ * 设置用户的 API 签名密钥（登录时调用）
+ * 格式: userId:secret
+ */
+export async function setUserApiSecret(userId: number): Promise<string> {
+  const secret = generateApiSecret(userId);
+  const c = await cookies();
+  c.set(API_SECRET_COOKIE, secret, {
+    httpOnly: false, // 前端需要读取用于签名
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 60 * 60 * 24 * 7,
+    path: "/",
+  });
+  return secret;
+}
+
+/**
+ * 获取当前登录用户的 ID
+ */
+export async function getSessionUserIdOnly(): Promise<number | null> {
+  const c = await cookies();
+  const raw = c.get(COOKIE_NAME)?.value;
+  if (!raw) return null;
+  try {
+    const [payload] = raw.split(".");
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString());
+    return typeof data.userId === "number" ? data.userId : null;
+  } catch {
+    return null;
+  }
 }
