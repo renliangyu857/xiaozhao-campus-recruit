@@ -535,6 +535,18 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* 备案信息 */}
+      <footer className="py-6 text-center text-xs text-slate-400">
+        <a
+          href="https://beian.miit.gov.cn/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-slate-600 transition-colors"
+        >
+          蜀ICP备2026009512号-1
+        </a>
+      </footer>
     </div>
   );
 }
