@@ -19,10 +19,25 @@ export function setUserApiSecret(secret: string): void {
 }
 
 /**
+ * 从 cookie 中获取 API secret
+ */
+function getApiSecretFromCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/campus_api_secret=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/**
  * 获取用户的 API 签名密钥
  */
 export function getUserApiSecret(): string | null {
   if (userApiSecret) return userApiSecret;
+
+  // 优先从 cookie 读取（后端设置）
+  const cookieSecret = getApiSecretFromCookie();
+  if (cookieSecret) return cookieSecret;
+
+  // 兼容 sessionStorage
   if (typeof sessionStorage !== "undefined") {
     return sessionStorage.getItem("api_secret");
   }
