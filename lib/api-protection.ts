@@ -60,7 +60,7 @@ export async function checkRateLimit(
 
     if (current >= config.max) {
       // 获取最早请求的过期时间
-      const oldest = await redis.zrange(key, 0, 0, { withScores: true });
+      const oldest = await redis.zrange(key, 0, 0, { withScores: true }) as Array<{ score: number }>;
       const resetTime = oldest.length > 0 ? Math.floor(oldest[0].score) + config.window : now + config.window;
 
       return {
