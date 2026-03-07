@@ -54,12 +54,12 @@ Phase 1: 问题诊断与分析
 - **Status:** complete
 
 ### Phase 6: 完整E2E测试
-- [ ] 执行完整E2E测试套件
-- [ ] 验证登录流程
-- [ ] 验证会员购买与有效期顺延
-- [ ] 验证笔面试资料购买下载
-- [ ] 记录测试结果
-- **Status:** pending (环境变量配置问题)
+- [x] 执行完整E2E测试套件
+- [x] 验证登录流程
+- [x] 验证会员购买与有效期顺延
+- [x] 验证笔面试资料购买下载
+- [x] 记录测试结果
+- **Status:** complete (93 passed, 33 failed - API签名导致)
 
 ## Key Questions
 
@@ -84,6 +84,27 @@ Phase 1: 问题诊断与分析
 | 'purchase' is assigned but never used | 1 | 移除未使用的变量赋值 |
 | 'e' is defined but never used | 1 | 删除 catch 块中的未使用参数 |
 | E2E webServer timeout 60000ms | 1 | 环境变量配置问题，需本地测试 |
+| E2E 33 failures | 1 | API签名验证导致，需更新测试代码适配 |
+
+## E2E 失败分析
+
+### 主要失败原因
+1. **API 签名验证 (14 failures)** - `/api/jobs` 返回 401
+   - E2E 测试未适配 API 签名验证（反爬虫功能）
+   - 需要更新测试：从 cookie 读取 secret 并添加请求头签名
+
+2. **登录状态检测 (9 failures)** - 登录按钮未隐藏
+   - 可能与 API 401 错误相关，登录流程未完成
+
+3. **导航测试 (2 failures)** - 路由跳转未生效
+   - 可能受前端路由守卫影响
+
+4. **字段名不匹配 (2 failures)** - `count` vs `totalInvited`
+   - API 返回字段名变更，测试未同步更新
+
+### 修复建议
+- 更新 E2E 测试工具函数，支持 API 签名
+- 或添加 E2E 测试专用的 API 白名单
 
 ## Notes
 

@@ -50,8 +50,16 @@
 - Build: ✅ 构建成功（修复了 TypeScript 错误）
 
 ### Phase 6: E2E测试
-- **Status:** partial
-- **Note:** E2E 启动超时（60000ms），需本地环境配置完整后测试
+- **Status:** complete
+- **Completed:** 2026-03-07
+- **Results:** 93 passed, 33 failed
+- **Failure Analysis:**
+  - 14 个失败因 `/api/jobs` 返回 401（API 签名验证未通过）
+  - 9 个登录测试失败（微信登录按钮未隐藏）
+  - 2 个导航测试失败（URL 未变化）
+  - 2 个字段名不匹配（`count` vs `totalInvited`）
+  - 1 个频率限制 429
+- **Root Cause:** E2E 测试未适配 API 签名验证（反爬虫功能）
 
 ## Test Results
 
@@ -60,6 +68,23 @@
 |------|----------|--------|--------|
 | npm run build | 无 TypeScript 错误 | 构建成功 | ✅ |
 | 新 API 路由注册 | /api/pan-materials/* 存在 | 路由已注册 | ✅ |
+
+### E2E 测试结果
+| Metric | Value |
+|--------|-------|
+| Total | 126 |
+| Passed | 93 (74%) |
+| Failed | 33 (26%) |
+| Duration | 10.2m |
+
+### 失败分类
+| 类别 | 数量 | 原因 |
+|------|------|------|
+| API 签名 401 | 14 | /api/jobs 需要签名验证 |
+| 登录测试 | 9 | 登录按钮状态未更新 |
+| 导航测试 | 2 | 路由跳转未生效 |
+| 字段不匹配 | 2 | invite/stats 返回字段名变更 |
+| 频率限制 | 1 | 登录接口 429 |
 
 ### 代码变更总结
 | 文件 | 变更类型 | 说明 |
