@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { verifySignature, getRequestPath } from "./api-sign";
-import { getUserApiSecret } from "./session";
+import { getUserApiSecret, setUserApiSecret } from "./session";
 
 // Redis 实例
 const redis = new Redis({
@@ -119,24 +119,28 @@ export async function validateApiSignature(
 /**
  * API 防护中间件
  * 组合签名验证 + 频率限制
+ * 兼容模式：如果没有 API Secret，自动发放
  */
 export async function apiProtectionMiddleware(
   request: NextRequest,
   userId: string
 ): Promise<
-  | { success: true }
+  | { success: true; response?: NextResponse }
   | { success: false; response: NextResponse }
 > {
-  // 1. 获取用户的 API secret
-  const userSecret = await getUserApiSecret();
+  // 1. 获取或自动发放用户的 API secret
+  let userSecret = await getUserApiSecret();
   if (!userSecret) {
-    return {
-      success: false,
-      response: NextResponse.json(
-        { error: "API secret not found", code: "NO_API_SECRET" },
-        { status: 403 }
-      ),
-    };
+    // 自动发放 API Secret（兼容老用户）
+    console.log(`[ApiProtection] Auto-generating API secret for user ${userId}`);
+    userSecret = await setUserApiSecret(Number(userId));
+
+    // 返回 401 提示客户端重试（因为这次请求没有签名，需要客户端重新请求）
+    const response = NextResponse.json(
+      { error: "API secret initialized, please retry", code: "API_SECRET_INIT", retry: true },
+      { status: 401 }
+    );
+    return { success: true, response };
   }
 
   // 2. 验证签名

@@ -23,6 +23,10 @@ export async function GET(request: NextRequest) {
   if (!protection.success) {
     return protection.response;
   }
+  // 如果自动发放了 API Secret，直接返回（客户端会重试）
+  if (protection.response) {
+    return protection.response;
+  }
 
   const { searchParams } = request.nextUrl;
   const industry = searchParams.get("industry") ?? undefined;

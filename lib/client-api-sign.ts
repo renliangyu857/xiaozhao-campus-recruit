@@ -128,9 +128,25 @@ export async function signedFetch(
  */
 export async function protectedFetch<T>(
   url: string,
-  options?: RequestInit
+  options?: RequestInit,
+  retryCount = 0
 ): Promise<T> {
   const response = await signedFetch(url, options);
+
+  // 处理 API Secret 初始化（兼容老用户）
+  if (response.status === 401) {
+    const error = await response.json().catch(() => ({ error: "Unauthorized" }));
+    if (error.code === "API_SECRET_INIT" && error.retry && retryCount < 2) {
+      // 等待 Cookie 设置完成
+      await new Promise(resolve => setTimeout(resolve, 500));
+      // 重新获取 secret 并重试
+      const newSecret = getUserApiSecret();
+      if (newSecret) {
+        return protectedFetch(url, options, retryCount + 1);
+      }
+    }
+    throw new Error(error.error || "请先登录");
+  }
 
   if (response.status === 403) {
     const error = await response.json().catch(() => ({ error: "Forbidden" }));
