@@ -103,3 +103,22 @@ model ReferralCode {
   @@index([isValid])
   @@map("referral_code")
 }
+
+model PanMaterialPurchase {
+  id            BigInt    @id @default(autoincrement())
+  userId        BigInt    @map("user_id")
+  materialId    String    @map("material_id") @db.VarChar(64)
+  materialName  String    @map("material_name") @db.VarChar(256)
+  price         Decimal   @db.Decimal(10, 2) @default(6.60)
+  orderNo       String?   @unique @map("order_no") @db.VarChar(64)
+  payStatus     String    @map("pay_status") @db.VarChar(32) @default("pending")
+  paidAt        DateTime? @map("paid_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@unique([userId, materialId])
+  @@index([userId])
+  @@index([materialId])
+  @@index([payStatus])
+  @@map("pan_material_purchase")
+}

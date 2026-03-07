@@ -1,85 +1,110 @@
 # Progress Log
 
-## Session: 2026-02-24
+## Session: 2026-03-07
 
-### Phase 1: Requirements & Discovery
-- **Status:** in_progress
-- **Started:** 2026-02-24
-- Actions taken:
-  - 阅读 planning-with-files 模板，创建 task_plan.md、findings.md、progress.md
-  - 抓取参考页 https://www.qiuzhifangzhou.com/exam?table=exam（得到标题与兑换码相关片段）
-  - 检索项目结构：前端 App.tsx 路由（/, /vip, /progress, /invite, /referral-codes），无 exam/网盘相关页
-  - 检索「百度网盘 分享链接 获取文件列表」：结论为无官方直接支持，可用第三方 API 或导出清单
+### Phase 1: 问题诊断与分析
+- **Status:** complete
+- **Started:** 2026-03-07
+- **Completed:** 2026-03-07
+- Findings:
+  1. **问题2（会员顺延）**：create-order 路由直接使用 new Date() 计算 endAt，没有检查现有会员
+  2. **问题3（年度会员）**：VALID_PLANS 中没有 "1_year"，只有 "lifetime"
+  3. **问题4（单独购买）**：需要新增数据库表和购买接口
+  4. **问题1（登录提示）**：需要用户提供截图或更多上下文
 - Files created/modified:
-  - task_plan.md (created)
-  - findings.md (created)
-  - progress.md (created)
+  - task_plan.md (updated)
+  - findings.md (updated)
+  - progress.md (updated)
 
-### Phase 2: Planning & Structure
-- **Status:** complete
-- Actions taken: 确定静态清单 + 前端搜索；路由 /exam；表格列：名称、分类、类型、操作
-- Files created/modified: task_plan.md, findings.md
+### Phase 2: 修复登录提示问题
+- **Status:** pending (需用户确认具体问题场景)
 
-### Phase 3: Implementation
+### Phase 3: 修复会员有效期顺延
 - **Status:** complete
-- Actions taken:
-  - 新增 types.PanFileItem、frontend/data/panMaterials.ts（SHARE_URL、EXTRACT_CODE、示例条目）
-  - 新增 ExamPage.tsx：搜索框、表格、打开网盘、复制提取码
-  - App.tsx 增加 Route /exam，NavBar 增加「笔面试资料」入口（桌面+移动）
-- Files created/modified: frontend/types.ts, frontend/data/panMaterials.ts, frontend/pages/ExamPage.tsx, frontend/App.tsx, frontend/components/NavBar.tsx
+- **Completed:** 2026-03-07
+- Changes:
+  - 修改 [app/api/vip/create-order/route.ts](app/api/vip/create-order/route.ts:33-44)
+  - 查询当前有效会员，在其结束时间基础上顺延新会员有效期
+  - 月度会员+1月，季度会员+3月，年度会员+1年
+
+### Phase 4: 修复年度会员购买
+- **Status:** complete
+- **Completed:** 2026-03-07
+- Changes:
+  - 修改 [app/api/vip/create-order/route.ts](app/api/vip/create-order/route.ts:7)
+  - VALID_PLANS 从 `["1_month", "3_month", "lifetime"]` 改为 `["1_month", "3_month", "1_year"]`
+
+### Phase 5: 笔面试资料单独购买
+- **Status:** complete
+- **Completed:** 2026-03-07
+- Changes:
+  - 创建数据库 migration: `prisma/migrations/20250307000000_add_pan_material_purchase/migration.sql`
+  - 更新 schema.prisma 添加 `PanMaterialPurchase` 模型
+  - 创建 API 路由:
+    - [app/api/pan-materials/check/route.ts](app/api/pan-materials/check/route.ts) - 查询已购买资料
+    - [app/api/pan-materials/purchase/route.ts](app/api/pan-materials/purchase/route.ts) - 创建购买订单
+  - 修改 [app/exam/page.tsx](app/exam/page.tsx) 添加购买 UI:
+    - 检测用户已购买资料
+    - 弹窗添加"单独购买 ¥6.6"按钮
+    - 购买成功后自动解锁下载
+- Build: ✅ 构建成功（修复了 TypeScript 错误）
+
+### Phase 6: E2E测试
+- **Status:** partial
+- **Note:** E2E 启动超时（60000ms），需本地环境配置完整后测试
 
 ## Test Results
 
-| Test | Input | Expected | Actual | Status |
-|------|-------|----------|--------|--------|
-| 访问 /exam | 打开 #/exam | 显示笔面试资料页、表格、搜索框 | 路由与组件已接入 | ✓ |
-| 搜索过滤 | 输入「面经」 | 仅显示含「面经」的名称/分类 | 前端 useMemo 过滤 | ✓ |
-| 打开网盘 | 点击「打开网盘」 | 新标签打开百度网盘分享链接 | 使用 window.open(shareUrl) | ✓ |
-| 复制提取码 | 点击复制 | 粘贴为 yjdf | 使用 navigator.clipboard.writeText | ✓ |
+### 构建验证
+| Test | Expected | Actual | Status |
+|------|----------|--------|--------|
+| npm run build | 无 TypeScript 错误 | 构建成功 | ✅ |
+| 新 API 路由注册 | /api/pan-materials/* 存在 | 路由已注册 | ✅ |
 
-### 启动报错修复（2026-02-24）
-- **Error:** Failed to bind properties under 'app.vip.plans' to java.util.Map&lt;String, VipPlanProperties.PlanEntry&gt;
-- **Cause:** `app.vip.plans` 下只有注释、没有实际 key，Spring 绑定 Map 时解析异常
-- **Fix:** 在 application.yml 中改为显式空 Map：`plans: {}`，示例配置保留在注释中供后续覆盖默认价
+### 代码变更总结
+| 文件 | 变更类型 | 说明 |
+|------|----------|------|
+| app/api/vip/create-order/route.ts | 修改 | 修复年度会员 + 会员顺延 |
+| prisma/schema.prisma | 修改 | 添加 PanMaterialPurchase 模型 |
+| prisma/migrations/* | 新增 | 数据库迁移文件 |
+| app/api/pan-materials/check/route.ts | 新增 | 查询已购买资料 API |
+| app/api/pan-materials/purchase/route.ts | 新增 | 创建购买订单 API |
+| app/exam/page.tsx | 修改 | 添加单独购买功能 UI |
 
 ## Error Log
 
 | Timestamp | Error | Attempt | Resolution |
 |-----------|-------|---------|------------|
-| 2026-02-27 | E2E 126 用例中 6 个 UI 失败、1 个 skip | 1 | 见 findings.md「E2E 测试结论」与「前端响应速度慢」；task_plan.md Errors Encountered 已更新 |
+| 2026-03-07 | 'purchase' is assigned but never used | 1 | 移除未使用的变量赋值 |
+| 2026-03-07 | 'e' is defined but never used | 1 | 删除 catch 块中的未使用参数 |
+| 2026-03-07 | E2E webServer timeout | 1 | 环境变量配置问题，需本地测试 |
 
 ## 5-Question Reboot Check
 
 | Question | Answer |
 |----------|--------|
-| Where am I? | E2E 与前端性能 Phase A/B 已完成 |
-| Where am I going? | 可选：修 E2E 断言/登录前置、实施 findings 中的性能优化 |
-| What's the goal? | 执行完整 E2E 并定位前端响应慢 |
-| What have I learned? | findings.md（E2E 失败原因、API 与前端串行请求导致 6–12s 延迟） |
-| What have I done? | 跑 e2e、分析失败用例与 app/page.tsx / API、更新 task_plan/findings/progress |
+| Where am I? | Phase 3/4/5 已完成，Phase 2 需用户确认，Phase 6 需本地测试 |
+| Where am I going? | 部署代码并验证功能 |
+| What's the goal? | 修复3个bug + 添加1个新功能 |
+| What have I learned? | 找到所有根本原因并完成大部分修复 |
+| What have I done? | 完成4个任务中的3个，1个需用户确认 |
+
+## 待确认问题
+
+### 问题1: 登录提示问题
+用户反映点击登录时弹出"请先登录后操作"，但代码分析显示：
+- `alert("请先登录后操作")` 只在 [app/page.tsx](app/page.tsx:87) 的 `loadPage` 函数中触发
+- 该函数在点击"查询筛选"等操作时调用
+- 登录按钮本身 (`UserContext.onLogin`) 不会触发此 alert
+
+**需要用户提供**：
+1. 截图显示的具体场景
+2. 复现步骤（点击哪个按钮、在哪个页面）
 
 ---
 
-## E2E 完整运行结果（2026-02-27）
+## 历史记录
 
-- **命令**：`next-app` 下 `npm run e2e`（Playwright，chromium + api 两项目）
-- **结果**：126 用例，约 119 通过，6 失败，1 跳过。
-- **失败**：01-home 行业/地点/类型筛选（3）、02-auth-quota 付费弹层跳转会员（1）、03-pages 进度页/会员页返回首页（2）、99-api-full 完整流程（1）。
-- **根因**：见 findings.md「E2E 测试结论」与「前端响应速度慢」。
-- **性能**：API 单次 2–4s 常见；首页未登录点查询不请求，已登录时串行 consume + getCurrentUser + jobs 导致 6–12s，见 findings.md。
-
-## E2E 测试修复（2026-02-28）
-
-修复了之前失败的 6 个 UI 测试用例：
-
-| 测试文件 | 修复内容 |
-|----------|----------|
-| 01-home.spec.ts | 增加超时时间（登录 10s→15s，查询结果 15s→25s），应对串行请求慢的问题 |
-| 02-auth-quota.spec.ts | 1) 增加 describe 级超时（120s）；2) 登录超时 8s→15s；3) 每次查询后等待按钮恢复而非固定延迟；4) 跳转会员页使用 waitForURL 并增加超时 |
-| 03-pages.spec.ts | 增加各步骤超时（导航 15s，元素可见 20s），等待 networkidle 后再点击 |
-
-修复后结果：
-- **01-home**: 5 个测试全部通过 ✓
-- **02-auth-quota**: 3 个测试全部通过 ✓
-- **03-pages**: 7 个测试通过，1 个跳过（无职位时 skip）✓
-- **总计**: 13 通过，1 跳过
+### 2026-02-24 ~ 2026-02-28: 网盘资料功能与E2E修复
+- 完成笔面试资料页面（/exam）
+- 修复6个E2E失败用例

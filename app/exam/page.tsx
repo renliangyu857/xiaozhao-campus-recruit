@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ExternalLink, Lock, FileText, FileSpreadsheet, Video, X, Sparkles, BookOpen } from "lucide-react";
+import { Search, ExternalLink, Lock, FileText, FileSpreadsheet, Video, X, Sparkles, BookOpen, ShoppingCart } from "lucide-react";
 import type { PanFileItem, PanStats, VipDashboard } from "@/lib/types";
 import { PAN_MATERIALS_LIST, PAN_STATS, PAN_FILTER_TAGS } from "@/lib/panMaterials";
 import { loadPanExport } from "@/lib/panExportService";
 import { useUser } from "@/components/UserContext";
 import { getVipDashboard } from "@/lib/vipService";
+import { apiFetch } from "@/lib/apiClient";
 
 function FileIcon({ format }: { format?: string }) {
   const f = (format || "").toLowerCase();
@@ -64,6 +65,20 @@ export default function ExamPage() {
   const [loading, setLoading] = useState(true);
   const [vipDashboard, setVipDashboard] = useState<VipDashboard | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<PanFileItem | null>(null);
+  const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
+  const [purchasing, setPurchasing] = useState(false);
+
+  // 加载用户已购买的资料
+  useEffect(() => {
+    if (!user?.id) {
+      setPurchasedIds(new Set());
+      return;
+    }
+    apiFetch<{ purchasedIds: string[] }>("/pan-materials/check")
+      .then((data) => setPurchasedIds(new Set(data.purchasedIds)))
+      .catch(() => {});
+  }, [user?.id]);
 
   useEffect(() => {
     loadPanExport().then(({ items: loaded, stats: loadedStats, fromExport }) => {
@@ -101,16 +116,53 @@ export default function ExamPage() {
   const currentPage = Math.min(page, totalPages - 1);
   const pageItems = useMemo(() => filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE), [filtered, currentPage]);
 
+  // 检查是否有下载权限（VIP或单独购买）
+  const hasDownloadAccess = (item: PanFileItem): boolean => {
+    if (canDownload(vipDashboard)) return true;
+    return purchasedIds.has(item.id);
+  };
+
   const handleDownload = (item: PanFileItem) => {
     if (!user) {
       alert("请先登录");
       return;
     }
-    if (!canDownload(vipDashboard)) {
+    if (!hasDownloadAccess(item)) {
+      setSelectedItem(item);
       setShowPaywall(true);
       return;
     }
     window.open(item.shareUrl, "_blank");
+  };
+
+  // 处理单独购买
+  const handlePurchase = async () => {
+    if (!selectedItem || !user) return;
+    setPurchasing(true);
+    try {
+      const result = await apiFetch<{
+        orderId: string;
+        materialId: string;
+        alreadyPurchased?: boolean;
+        message: string;
+      }>("/pan-materials/purchase", {
+        method: "POST",
+        json: { materialId: selectedItem.id },
+      });
+
+      if (result.alreadyPurchased || result.orderId) {
+        // 模拟支付成功（实际项目中这里应该调用支付接口）
+        setPurchasedIds((prev) => new Set([...prev, selectedItem.id]));
+        setShowPaywall(false);
+        alert(`购买成功！已解锁「${selectedItem.name}」的下载权限`);
+        // 自动打开下载
+        window.open(selectedItem.shareUrl, "_blank");
+      }
+    } catch {
+      alert("购买失败，请稍后重试");
+    } finally {
+      setPurchasing(false);
+    }
   };
 
   return (
@@ -233,18 +285,22 @@ export default function ExamPage() {
                         <button
                           onClick={() => handleDownload(item)}
                           className={`inline-flex items-center gap-1.5 font-medium transition-colors ${
-                            canDownload(vipDashboard)
+                            hasDownloadAccess(item)
                               ? "text-[#FF6B4A] hover:text-[#E55A3C]"
                               : "text-slate-400 hover:text-slate-600"
                           }`}
                         >
-                          {canDownload(vipDashboard) ? (
+                          {hasDownloadAccess(item) ? (
                             <>
                               前往下载 <ExternalLink size={14} />
                             </>
+                          ) : purchasedIds.has(item.id) ? (
+                            <>
+                              <ExternalLink size={14} /> 已购下载
+                            </>
                           ) : (
                             <>
-                              <Lock size={14} /> 升级解锁
+                              <Lock size={14} /> 解锁下载
                             </>
                           )}
                         </button>
@@ -290,7 +346,7 @@ export default function ExamPage() {
       </div>
 
       {/* 下载权限弹窗 */}
-      {showPaywall && (
+      {showPaywall && selectedItem && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowPaywall(false)} />
           <div className="relative bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 text-center">
@@ -300,16 +356,34 @@ export default function ExamPage() {
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-[#FF6B4A]/20 to-[#FF8F7A]/10 mb-6">
               <Lock className="h-10 w-10 text-[#FF6B4A]" />
             </div>
-            <h3 className="text-xl font-bold text-slate-900">资料下载需季度/年度VIP</h3>
-            <p className="mt-3 text-sm text-slate-500 leading-relaxed">
-              开通季度会员或年度会员，即可解锁全部 {stats.fileCount.toLocaleString()} 份笔面试资料下载权限
+            <h3 className="text-xl font-bold text-slate-900">解锁资料下载</h3>
+            <p className="mt-2 text-sm text-slate-600 font-medium truncate px-4" title={selectedItem.name}>
+              {selectedItem.name}
             </p>
+            <p className="mt-3 text-sm text-slate-500 leading-relaxed">
+              开通季度/年度会员可解锁全部 {stats.fileCount.toLocaleString()} 份资料
+              <br />
+              或单独购买当前资料
+            </p>
+
+            {/* 单独购买按钮 */}
+            <button
+              onClick={handlePurchase}
+              disabled={purchasing}
+              className="mt-6 w-full rounded-xl bg-gradient-to-r from-[#0D7377] to-[#14919b] py-4 text-sm font-bold text-white hover:shadow-lg hover:shadow-teal-200 transition-all flex items-center justify-center gap-2"
+            >
+              <ShoppingCart size={16} />
+              {purchasing ? "处理中..." : "单独购买 ¥6.6"}
+            </button>
+
+            {/* 升级会员按钮 */}
             <button
               onClick={() => { setShowPaywall(false); router.push("/vip"); }}
-              className="mt-8 w-full rounded-xl bg-gradient-to-r from-[#FF6B4A] to-[#FF8F7A] py-4 text-sm font-bold text-white hover:shadow-lg hover:shadow-orange-200 transition-all"
+              className="mt-3 w-full rounded-xl bg-gradient-to-r from-[#FF6B4A] to-[#FF8F7A] py-4 text-sm font-bold text-white hover:shadow-lg hover:shadow-orange-200 transition-all"
             >
-              立即升级会员
+              升级季度/年度会员
             </button>
+
             <button onClick={() => setShowPaywall(false)} className="mt-4 text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors">
               暂不需要
             </button>

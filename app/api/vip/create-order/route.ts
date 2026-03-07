@@ -4,7 +4,7 @@ import { getSessionUserId } from "@/lib/session";
 import { getClientIp, rateLimitCheck } from "@/lib/rateLimit";
 import { logger } from "@/lib/logger";
 
-const VALID_PLANS = ["1_month", "3_month", "lifetime"];
+const VALID_PLANS = ["1_month", "3_month", "1_year"];
 const ORDER_RATE_WINDOW = 60;
 const ORDER_RATE_MAX = 10;
 
@@ -30,17 +30,24 @@ export async function POST(request: NextRequest) {
   if (!planId || !VALID_PLANS.includes(planId)) {
     return NextResponse.json({ message: "套餐无效或用户不存在" }, { status: 400 });
   }
-  const now = new Date();
+  // 查询用户当前有效会员，用于计算顺延时间
+  const currentMember = await prisma.userMember.findFirst({
+    where: { userId, endAt: { gte: new Date() } },
+    orderBy: { endAt: "desc" },
+  });
+
+  // 从当前会员结束时间或现在时间开始计算新会员有效期
+  const startAt = currentMember ? currentMember.endAt : new Date();
   let endAt: Date;
   if (planId === "1_month") {
-    endAt = new Date(now); endAt.setMonth(endAt.getMonth() + 1);
+    endAt = new Date(startAt); endAt.setMonth(endAt.getMonth() + 1);
   } else if (planId === "3_month") {
-    endAt = new Date(now); endAt.setMonth(endAt.getMonth() + 3);
+    endAt = new Date(startAt); endAt.setMonth(endAt.getMonth() + 3);
   } else {
-    endAt = new Date(now); endAt.setFullYear(endAt.getFullYear() + 99);
+    endAt = new Date(startAt); endAt.setFullYear(endAt.getFullYear() + 1);
   }
   await prisma.userMember.create({
-    data: { userId, planId, startAt: now, endAt },
+    data: { userId, planId, startAt, endAt },
   });
   logger.info("vip_order_created", { userId: String(userId), planId });
   return NextResponse.json({
