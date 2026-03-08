@@ -38,7 +38,7 @@ export async function GET() {
     where: { userId },
     orderBy: { endAt: "desc" },
   });
-  logger.info("auth_current_all_members", { userId: String(userId), count: allMembers.length, members: allMembers.map(m => ({ id: m.id, planId: m.planId, startAt: m.startAt.toISOString(), endAt: m.endAt.toISOString() })) });
+  logger.info("auth_current_all_members", { userId: String(userId), count: allMembers.length, members: allMembers.map(m => ({ id: String(m.id), planId: m.planId, startAt: m.startAt.toISOString(), endAt: m.endAt.toISOString() })) });
 
   const membership = await prisma.userMember.findFirst({
     where: { userId, startAt: { lte: now }, endAt: { gte: now } },
