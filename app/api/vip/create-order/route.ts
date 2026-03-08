@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { getClientIp, rateLimitCheck } from "@/lib/rateLimit";
 import { logger } from "@/lib/logger";
+import { invalidateAuthCurrentCache } from "@/lib/cache";
 
 const VALID_PLANS = ["1_month", "3_month", "1_year"];
 const ORDER_RATE_WINDOW = 60;
@@ -55,6 +56,9 @@ export async function POST(request: NextRequest) {
   await prisma.userMember.create({
     data: { userId, planId, startAt, endAt },
   });
+
+  // 清除用户缓存，确保前端获取最新VIP状态
+  await invalidateAuthCurrentCache(userId);
 
   logger.info("vip_order_created", {
     userId: String(userId),
