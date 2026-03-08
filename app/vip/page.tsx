@@ -126,7 +126,7 @@ export default function VIPPage() {
     if (!window.confirm(`确认支付 ¥${plan.price} 开通 ${plan.name}？`)) return;
     setLoading(true);
     try {
-      await createVipOrder(plan.id);
+      const orderResult = await createVipOrder(plan.id);
 
       // 刷新用户信息以获取最新的VIP状态
       clearUserCache();
@@ -139,9 +139,9 @@ export default function VIPPage() {
         setDashboard({ isTrial: d.isTrial, referralCodeCount: d.referralCodeCount, vipExpiry: d.vipExpiry });
       }
 
-      // 显示购买成功弹窗
+      // 显示购买成功弹窗 - 优先使用订单返回的新到期时间
       setPurchasedPlanName(plan.name);
-      setPurchasedExpiryDate(u.vipExpiry ?? "");
+      setPurchasedExpiryDate(orderResult.newVipExpiry ?? d?.vipExpiry ?? u.vipExpiry ?? "");
       setShowSuccessModal(true);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) alert("请先登录");
