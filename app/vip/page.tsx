@@ -90,7 +90,7 @@ function getDisplayTag(plan: VipPlan): string {
 export default function VIPPage() {
   const { user, setUser } = useUser();
   const [plans, setPlans] = useState<VipPlan[]>([]);
-  const [dashboard, setDashboard] = useState<Pick<VipDashboard, "isTrial" | "referralCodeCount"> | null>(null);
+  const [dashboard, setDashboard] = useState<Pick<VipDashboard, "isTrial" | "referralCodeCount" | "vipExpiry"> | null>(null);
   const [loading, setLoading] = useState(false);
   const [tickerIndex, setTickerIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
@@ -107,7 +107,7 @@ export default function VIPPage() {
 
   useEffect(() => {
     if (!user?.isVip) return;
-    getVipDashboard().then((d) => setDashboard({ isTrial: d.isTrial, referralCodeCount: d.referralCodeCount })).catch(() => {});
+    getVipDashboard().then((d) => setDashboard({ isTrial: d.isTrial, referralCodeCount: d.referralCodeCount, vipExpiry: d.vipExpiry })).catch(() => {});
   }, [user?.id, user?.isVip]);
 
   useEffect(() => {
@@ -136,7 +136,7 @@ export default function VIPPage() {
       // 获取仪表盘信息
       if (u.isVip) {
         const d = await getVipDashboard();
-        setDashboard({ isTrial: d.isTrial, referralCodeCount: d.referralCodeCount });
+        setDashboard({ isTrial: d.isTrial, referralCodeCount: d.referralCodeCount, vipExpiry: d.vipExpiry });
       }
 
       // 显示购买成功弹窗
@@ -200,7 +200,7 @@ export default function VIPPage() {
                     {user.isTrial || dashboard?.isTrial ? "体验会员" : "尊贵的 VIP 会员"}
                   </h2>
                   <p className="text-white/80 text-base">
-                    会员有效期至：<span className="font-mono font-bold text-white text-lg">{user.vipExpiry ?? "—"}</span>
+                    会员有效期至：<span className="font-mono font-bold text-white text-lg">{dashboard?.vipExpiry ?? user.vipExpiry ?? "—"}</span>
                   </p>
                   {dashboard && (dashboard.referralCodeCount ?? 0) > 0 && (
                     <p className="mt-2 text-white/70 text-sm">
