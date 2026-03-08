@@ -420,8 +420,8 @@ export default function VIPPage() {
         planName={purchasedPlanName}
         expiryDate={purchasedExpiryDate}
         onExperience={() => {
-          // 可以跳转到某个功能页面，如投递进度管理
-          window.location.href = "/progress";
+          // 跳转到职位查询页面
+          window.location.href = "/";
         }}
         onViewBenefits={() => {
           // 滚动到权益对比表格
