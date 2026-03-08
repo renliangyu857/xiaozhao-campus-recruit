@@ -35,8 +35,12 @@ export async function GET() {
     }
   }
 
-  // 找出最新的会员记录用于显示
-  const latestMember = members[members.length - 1];
+  // 找出结束时间最晚的会员记录用于显示
+  const latestMember = members.length > 0
+    ? members.reduce((latest, current) =>
+        current.endAt > latest.endAt ? current : latest
+      )
+    : null;
 
   // 笔面试资料下载权限：累计有效时长 >= 90天（3个月）
   const canDownloadMaterials = totalDays >= 90;
