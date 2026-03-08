@@ -66,12 +66,27 @@ export default function HomePage() {
     setFavoriteIds(getFavoriteJobIds(user.id));
 
     // VIP 用户登录后自动加载职位列表（只触发一次）
-    if (user.isVip && !hasAutoLoaded.current) {
+    // 注意：只有在用户存在且是VIP时才自动加载
+    if (user && user.isVip && !hasAutoLoaded.current) {
       hasAutoLoaded.current = true;
       // 使用 setTimeout 避免在 render 阶段调用 setState
       setTimeout(() => {
-        loadPage(0, true, false);
-      }, 0);
+        // 使用函数式调用确保获取最新的 user 状态
+        if (user) {
+          fetchJobsPage(filters, onlyNewToday, 0, pageSize)
+            .then((result) => {
+              setPageResult(result);
+              setDisplayJobs(result.content);
+              setCurrentPage(0);
+            })
+            .catch((error) => {
+              if (error instanceof ApiError && error.status === 401) {
+                // 登录过期，不显示alert
+                hasAutoLoaded.current = false;
+              }
+            });
+        }
+      }, 100);
     }
   }, [user?.id, user?.isVip]);
 

@@ -59,6 +59,8 @@ export interface VipDashboard {
   vipExpiry?: string;
   referralCodeCount: number;
   savedQueryCount: number;
+  totalValidDays?: number; // 累计有效会员天数
+  canDownloadMaterials?: boolean; // 是否有笔面试资料下载权限（累计>=90天）
 }
 
 export interface FilterState {

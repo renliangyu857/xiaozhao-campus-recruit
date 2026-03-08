@@ -17,8 +17,13 @@ function FileIcon({ format }: { format?: string }) {
   return <FileSpreadsheet size={18} className="text-slate-400 shrink-0" />;
 }
 
-// 检查用户是否有下载权限（季度或年度VIP）
+// 检查用户是否有下载权限（累计有效时长>=3个月）
 function canDownload(vipDashboard: VipDashboard | null): boolean {
+  // 优先使用后端计算的权限字段
+  if (vipDashboard?.canDownloadMaterials !== undefined) {
+    return vipDashboard.canDownloadMaterials;
+  }
+  // 兼容旧逻辑
   if (!vipDashboard?.isVip) return false;
   return vipDashboard.planId === "3_month" || vipDashboard.planId === "1_year";
 }
@@ -158,8 +163,10 @@ export default function ExamPage() {
         // 自动打开下载
         window.open(selectedItem.shareUrl, "_blank");
       }
-    } catch {
-      alert("购买失败，请稍后重试");
+    } catch (error) {
+      console.error("购买失败:", error);
+      const message = error instanceof Error ? error.message : "购买失败，请稍后重试";
+      alert(message);
     } finally {
       setPurchasing(false);
     }
@@ -243,7 +250,7 @@ export default function ExamPage() {
               <span className="text-slate-700">
                 <span className="font-semibold">季度会员和年度会员</span>可解锁全部资料下载，
                 <button onClick={() => router.push("/vip")} className="text-[#FF6B4A] hover:underline font-medium ml-1">
-                  去升级 →
+                  去购买 →
                 </button>
               </span>
             </div>
@@ -376,7 +383,7 @@ export default function ExamPage() {
               {purchasing ? "处理中..." : "单独购买 ¥6.6"}
             </button>
 
-            {/* 升级会员按钮 */}
+            {/* 购买会员按钮 */}
             <button
               onClick={() => { setShowPaywall(false); router.push("/vip"); }}
               className="mt-3 w-full rounded-xl bg-gradient-to-r from-[#FF6B4A] to-[#FF8F7A] py-4 text-sm font-bold text-white hover:shadow-lg hover:shadow-orange-200 transition-all"

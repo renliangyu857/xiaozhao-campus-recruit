@@ -178,7 +178,7 @@ export default function VIPPage() {
               WebkitTextFillColor: 'transparent'
             }}
           >
-            升级 VIP，校招快人一步
+            购买 VIP，校招快人一步
           </h1>
           <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
             无限查询 · 进度管理 · 内推码库 · 笔面试资料，让求职之路更加顺畅
@@ -304,7 +304,7 @@ export default function VIPPage() {
                       : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                   }`}
                 >
-                  {user?.isVip ? "升级" : "立即开通"}
+                  {user?.isVip ? "购买" : "立即开通"}
                 </button>
               </div>
             );

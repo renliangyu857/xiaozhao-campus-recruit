@@ -126,7 +126,7 @@ export default function ReferralCodesPage() {
               <Lock className="text-[#FF6B4A]" size={36} />
             </div>
             <h2 className="text-xl font-bold text-slate-900 mb-2">VIP 专属内容</h2>
-            <p className="text-slate-600 mb-6">升级会员查看完整内推码，直通名企面试</p>
+            <p className="text-slate-600 mb-6">购买会员查看完整内推码，直通名企面试</p>
             <button
               onClick={() => router.push("/vip")}
               className="bg-gradient-to-r from-[#FF6B4A] to-[#FF8F7A] text-white px-8 py-3.5 rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-orange-200 transition-all"
