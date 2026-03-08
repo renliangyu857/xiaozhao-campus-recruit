@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { getClientIp, rateLimitCheck } from "@/lib/rateLimit";
 import { logger } from "@/lib/logger";
-import { invalidateAuthCurrentCache } from "@/lib/cache";
+import { invalidateAuthCurrentCache, authCurrentCacheKey } from "@/lib/cache";
+import { getRedis } from "@/lib/redis";
 
 const VALID_PLANS = ["1_month", "3_month", "1_year"];
 const ORDER_RATE_WINDOW = 60;
@@ -60,6 +61,18 @@ export async function POST(request: NextRequest) {
   // 清除用户缓存，确保前端获取最新VIP状态
   await invalidateAuthCurrentCache(userId);
 
+  // 额外：直接删除Redis缓存并验证
+  const redis = getRedis();
+  const cacheKey = authCurrentCacheKey(userId);
+  if (redis) {
+    try {
+      await redis.del(cacheKey);
+      logger.info("vip_order_cache_cleared", { userId: String(userId), cacheKey });
+    } catch (e) {
+      logger.warn("vip_order_cache_clear_failed", { userId: String(userId), error: String(e) });
+    }
+  }
+
   logger.info("vip_order_created", {
     userId: String(userId),
     planId,
@@ -68,10 +81,17 @@ export async function POST(request: NextRequest) {
     hasExistingMember: !!currentMember,
     existingEndAt: currentMember?.endAt.toISOString(),
   });
+  // 计算显示给用户的新的VIP到期时间
+  const newVipExpiry = endAt.toISOString().slice(0, 10);
+
   return NextResponse.json({
     orderId: `order_${Date.now()}`,
     planId,
     amount: 0,
     message: "订单创建成功（模拟）",
+    refreshUser: true, // 告诉前端需要刷新用户信息
+    newVipExpiry, // 新的到期时间
+    startAt: startAt.toISOString(),
+    endAt: endAt.toISOString(),
   });
 }
