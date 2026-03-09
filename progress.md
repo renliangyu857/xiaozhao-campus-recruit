@@ -1,8 +1,130 @@
 # Progress Log
 
-## Session: 2026-03-07
+## Session: 2026-03-08 ~ 2026-03-09 - 微信Native支付接入
 
-### Phase 1: 问题诊断与分析
+### Phase 1: 设计确认 ✅
+- **Status:** complete
+- **Started:** 2026-03-08
+- **Completed:** 2026-03-08
+- **Deliverable:** `docs/wechat-native-payment-design.md`
+- **已确认:** 商户参数已预留，Native支付方式确认
+
+### Phase 2: 数据库迁移 ✅
+- **Status:** complete
+- **Completed:** 2026-03-08
+- **Tasks:**
+  - [x] 更新 schema.prisma 添加 Order 表
+  - [x] 同步到数据库 (prisma db push)
+  - [x] 生成 Prisma Client
+
+### Phase 3: 后端API开发 ✅
+- **Status:** complete
+- **Completed:** 2026-03-08
+- **Tasks:**
+  - [x] 创建 `lib/payment-config.ts` 价格配置
+  - [x] 创建 `lib/wechat-pay.ts` 微信支付工具
+  - [x] 创建 `/api/payment/create` 接口
+  - [x] 创建 `/api/payment/notify` 回调接口
+  - [x] 创建 `/api/payment/order/:orderNo` 查询接口
+  - [x] 创建 `/api/payment/qrcode/:orderNo` 二维码接口
+
+### Phase 4: 前端支付组件 ✅
+- **Status:** complete
+- **Completed:** 2026-03-09
+- **Tasks:**
+  - [x] 创建 `lib/payment.ts` 支付服务
+  - [x] 创建 `PaymentQRCodeModal` 组件
+  - [x] 更新VIP购买流程 ([app/vip/page.tsx])
+  - [x] 更新资料购买流程 ([app/exam/page.tsx])
+  - [x] 修复构建错误 (类型问题、ESLint警告)
+
+### 构建状态
+- **Status:** ✅ 构建成功
+- **Completed:** 2026-03-09
+- **Routes:** 新增 `/api/payment/*` 路由
+
+### Files Modified
+
+| 文件 | 变更类型 | 说明 |
+|------|----------|------|
+| `app/vip/page.tsx` | 修改 | 接入微信支付流程 |
+| `app/exam/page.tsx` | 修改 | 资料购买接入微信支付 |
+| `app/api/payment/order/[orderNo]/route.ts` | 修改 | 修复Next.js 15 params类型 |
+| `app/api/payment/qrcode/[orderNo]/route.ts` | 修改 | 修复Next.js 15 params类型 + Buffer类型 |
+| `app/api/payment/create/route.ts` | 修改 | 修复ESLint错误 |
+| `app/api/payment/notify/route.ts` | 修改 | 修复类型错误 |
+| `lib/payment-config.ts` | 修改 | 修复类型错误 |
+| `lib/wechat-pay.ts` | 修改 | 修复类型错误 |
+| `package.json` | 修改 | 添加 `@types/qrcode` |
+
+## Code Changes Summary
+
+### VIP页面支付流程改造
+- **Before:** 使用模拟支付 `createVipOrder`，直接完成支付
+- **After:** 使用微信支付 `createPayment`，显示二维码弹窗，轮询支付状态
+
+主要变更：
+1. 新增导入：`PaymentQRCodeModal` 和 `createPayment`
+2. 新增状态：`showPaymentModal` 和 `paymentData`
+3. 重写 `handleUpgrade`：创建支付订单并显示二维码弹窗
+4. 新增 `handlePaymentSuccess`：支付成功后刷新用户状态并显示成功弹窗
+5. 添加 `PaymentQRCodeModal` 组件到页面底部
+
+### 资料购买流程改造 (exam页面)
+- **Before:** 使用模拟支付 `apiFetch("/pan-materials/purchase")`，直接完成支付
+- **After:** 使用微信支付 `createPayment`，显示二维码弹窗
+
+主要变更：
+1. 新增导入：`createPayment`, `PaymentQRCodeModal`, `CreatePaymentResult`
+2. 新增状态：`showPaymentModal` 和 `paymentData`
+3. 重写 `handlePurchase`：创建微信支付订单，显示二维码弹窗
+4. 新增 `handlePaymentSuccess`：支付成功后解锁下载并自动打开
+5. 添加 `PaymentQRCodeModal` 组件到页面底部
+
+### API路由类型修复
+- Next.js 15 中 `params` 变为 Promise 类型，需要 `await`
+- 修复了所有动态路由的类型定义
+
+## Errors Encountered & Fixed
+
+| Error | Attempt | Resolution |
+|-------|---------|------------|
+| P3006 Migration error | 1 | 使用 `prisma db push` 直接同步 |
+| BigInt序列化错误 | 1 | 将 m.id 改为 String(m.id) |
+| Next.js 15 params类型错误 | 1 | `{ params }: { params: Promise<{ orderNo: string }> }` |
+| Buffer类型错误 | 1 | `new Uint8Array(qrBuffer)` |
+| `any`类型错误 | 1 | 添加具体类型定义 |
+| 未使用变量错误 | 1 | 添加eslint-disable注释或移除 |
+| `successTime`可能为undefined | 1 | `successTime ? new Date(successTime) : new Date()` |
+| `qrcode`类型声明缺失 | 1 | `npm install --save-dev @types/qrcode` |
+| `getPrice`/`price`类型错误 | 1 | 使用类型断言 |
+
+## Test Plan
+
+### 需要测试的功能
+- [ ] 创建VIP订单成功（首月优惠价5.8元）
+- [ ] 创建VIP订单成功（非首月原价9.9元）
+- [ ] 创建资料购买订单（6.6元）
+- [ ] 二维码生成成功
+- [ ] 扫码支付成功
+- [ ] 支付成功回调处理
+- [ ] 订单查询接口
+- [ ] 重复支付防护
+- [ ] 金额篡改防护
+
+## Next Steps
+
+1. 配置生产环境微信支付参数（环境变量）
+2. 沙箱环境测试
+3. 生产环境部署
+
+---
+
+## 历史记录
+
+### Session: 2026-03-07
+
+#### Phase 1: 问题诊断与分析
 - **Status:** complete
 - **Started:** 2026-03-07
 - **Completed:** 2026-03-07
@@ -11,124 +133,26 @@
   2. **问题3（年度会员）**：VALID_PLANS 中没有 "1_year"，只有 "lifetime"
   3. **问题4（单独购买）**：需要新增数据库表和购买接口
   4. **问题1（登录提示）**：需要用户提供截图或更多上下文
-- Files created/modified:
-  - task_plan.md (updated)
-  - findings.md (updated)
-  - progress.md (updated)
 
-### Phase 2: 修复登录提示问题
+#### Phase 2: 修复登录提示问题
 - **Status:** pending (需用户确认具体问题场景)
 
-### Phase 3: 修复会员有效期顺延
+#### Phase 3: 修复会员有效期顺延
 - **Status:** complete
 - **Completed:** 2026-03-07
-- Changes:
-  - 修改 [app/api/vip/create-order/route.ts](app/api/vip/create-order/route.ts:33-44)
-  - 查询当前有效会员，在其结束时间基础上顺延新会员有效期
-  - 月度会员+1月，季度会员+3月，年度会员+1年
 
-### Phase 4: 修复年度会员购买
+#### Phase 4: 修复年度会员购买
 - **Status:** complete
 - **Completed:** 2026-03-07
-- Changes:
-  - 修改 [app/api/vip/create-order/route.ts](app/api/vip/create-order/route.ts:7)
-  - VALID_PLANS 从 `["1_month", "3_month", "lifetime"]` 改为 `["1_month", "3_month", "1_year"]`
 
-### Phase 5: 笔面试资料单独购买
+#### Phase 5: 笔面试资料单独购买
 - **Status:** complete
 - **Completed:** 2026-03-07
-- Changes:
-  - 创建数据库 migration: `prisma/migrations/20250307000000_add_pan_material_purchase/migration.sql`
-  - 更新 schema.prisma 添加 `PanMaterialPurchase` 模型
-  - 创建 API 路由:
-    - [app/api/pan-materials/check/route.ts](app/api/pan-materials/check/route.ts) - 查询已购买资料
-    - [app/api/pan-materials/purchase/route.ts](app/api/pan-materials/purchase/route.ts) - 创建购买订单
-  - 修改 [app/exam/page.tsx](app/exam/page.tsx) 添加购买 UI:
-    - 检测用户已购买资料
-    - 弹窗添加"单独购买 ¥6.6"按钮
-    - 购买成功后自动解锁下载
-- Build: ✅ 构建成功（修复了 TypeScript 错误）
 
-### Phase 6: E2E测试
+#### Phase 6: E2E测试
 - **Status:** complete
 - **Completed:** 2026-03-07
 - **Results:** 93 passed, 33 failed
-- **Failure Analysis:**
-  - 14 个失败因 `/api/jobs` 返回 401（API 签名验证未通过）
-  - 9 个登录测试失败（微信登录按钮未隐藏）
-  - 2 个导航测试失败（URL 未变化）
-  - 2 个字段名不匹配（`count` vs `totalInvited`）
-  - 1 个频率限制 429
-- **Root Cause:** E2E 测试未适配 API 签名验证（反爬虫功能）
-
-## Test Results
-
-### 构建验证
-| Test | Expected | Actual | Status |
-|------|----------|--------|--------|
-| npm run build | 无 TypeScript 错误 | 构建成功 | ✅ |
-| 新 API 路由注册 | /api/pan-materials/* 存在 | 路由已注册 | ✅ |
-
-### E2E 测试结果
-| Metric | Value |
-|--------|-------|
-| Total | 126 |
-| Passed | 93 (74%) |
-| Failed | 33 (26%) |
-| Duration | 10.2m |
-
-### 失败分类
-| 类别 | 数量 | 原因 |
-|------|------|------|
-| API 签名 401 | 14 | /api/jobs 需要签名验证 |
-| 登录测试 | 9 | 登录按钮状态未更新 |
-| 导航测试 | 2 | 路由跳转未生效 |
-| 字段不匹配 | 2 | invite/stats 返回字段名变更 |
-| 频率限制 | 1 | 登录接口 429 |
-
-### 代码变更总结
-| 文件 | 变更类型 | 说明 |
-|------|----------|------|
-| app/api/vip/create-order/route.ts | 修改 | 修复年度会员 + 会员顺延 |
-| prisma/schema.prisma | 修改 | 添加 PanMaterialPurchase 模型 |
-| prisma/migrations/* | 新增 | 数据库迁移文件 |
-| app/api/pan-materials/check/route.ts | 新增 | 查询已购买资料 API |
-| app/api/pan-materials/purchase/route.ts | 新增 | 创建购买订单 API |
-| app/exam/page.tsx | 修改 | 添加单独购买功能 UI |
-
-## Error Log
-
-| Timestamp | Error | Attempt | Resolution |
-|-----------|-------|---------|------------|
-| 2026-03-07 | 'purchase' is assigned but never used | 1 | 移除未使用的变量赋值 |
-| 2026-03-07 | 'e' is defined but never used | 1 | 删除 catch 块中的未使用参数 |
-| 2026-03-07 | E2E webServer timeout | 1 | 环境变量配置问题，需本地测试 |
-
-## 5-Question Reboot Check
-
-| Question | Answer |
-|----------|--------|
-| Where am I? | Phase 3/4/5 已完成，Phase 2 需用户确认，Phase 6 需本地测试 |
-| Where am I going? | 部署代码并验证功能 |
-| What's the goal? | 修复3个bug + 添加1个新功能 |
-| What have I learned? | 找到所有根本原因并完成大部分修复 |
-| What have I done? | 完成4个任务中的3个，1个需用户确认 |
-
-## 待确认问题
-
-### 问题1: 登录提示问题
-用户反映点击登录时弹出"请先登录后操作"，但代码分析显示：
-- `alert("请先登录后操作")` 只在 [app/page.tsx](app/page.tsx:87) 的 `loadPage` 函数中触发
-- 该函数在点击"查询筛选"等操作时调用
-- 登录按钮本身 (`UserContext.onLogin`) 不会触发此 alert
-
-**需要用户提供**：
-1. 截图显示的具体场景
-2. 复现步骤（点击哪个按钮、在哪个页面）
-
----
-
-## 历史记录
 
 ### 2026-02-24 ~ 2026-02-28: 网盘资料功能与E2E修复
 - 完成笔面试资料页面（/exam）

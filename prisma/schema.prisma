@@ -122,3 +122,53 @@ model PanMaterialPurchase {
   @@index([payStatus])
   @@map("pan_material_purchase")
 }
+
+// 订单表 - 统一管理VIP会员和资料购买订单
+model Order {
+  id            BigInt    @id @default(autoincrement())
+  orderNo       String    @unique @map("order_no") @db.VarChar(64)
+  userId        BigInt    @map("user_id")
+
+  // 商品信息
+  productType   String    @map("product_type") @db.VarChar(32)
+  productId     String    @map("product_id") @db.VarChar(32)
+  productName   String    @map("product_name") @db.VarChar(128)
+  amount        Int       @map("amount")
+  originalAmount Int?     @map("original_amount")
+
+  // 支付信息
+  payStatus     String    @map("pay_status") @db.VarChar(32) @default("pending")
+  payMethod     String?   @map("pay_method") @db.VarChar(32)
+  payTime       DateTime? @map("pay_time")
+
+  // 微信支付信息（Native支付特有）
+  wxCodeUrl     String?   @map("wx_code_url") @db.VarChar(512)
+  wxTransactionId String? @map("wx_transaction_id") @db.VarChar(64)
+
+  // 业务处理状态
+  bizStatus     String    @map("biz_status") @db.VarChar(32) @default("pending")
+  bizResult     Json?     @map("biz_result")
+
+  // 有效期（用于VIP订单）
+  validStartAt  DateTime? @map("valid_start_at")
+  validEndAt    DateTime? @map("valid_end_at")
+
+  // 客户端信息
+  clientIp      String?   @map("client_ip") @db.VarChar(64)
+  userAgent     String?   @map("user_agent") @db.VarChar(512)
+
+  // 回调记录
+  notifyCount   Int       @default(0) @map("notify_count")
+  lastNotifyAt  DateTime? @map("last_notify_at")
+  notifyResult  String?   @map("notify_result") @db.Text
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([orderNo])
+  @@index([payStatus])
+  @@index([productType, productId])
+  @@index([createdAt])
+  @@map("order")
+}

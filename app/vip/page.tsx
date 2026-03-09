@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Crown, Check, Bell, BookOpen, Sparkles, Star, Zap } from "lucide-react";
-import { getVipPlans, getVipDashboard, createVipOrder } from "@/lib/vipService";
+import { getVipPlans, getVipDashboard } from "@/lib/vipService";
 import { getCurrentUser } from "@/lib/authService";
 import { ApiError } from "@/lib/apiClient";
 import { useUser } from "@/components/UserContext";
 import { clearUserCache } from "@/lib/authService";
 import { PaymentSuccessModal } from "@/components/PaymentSuccessModal";
+import { PaymentQRCodeModal } from "@/components/PaymentQRCodeModal";
+import { createPayment, type CreatePaymentResult } from "@/lib/payment";
 import type { VipPlan, VipDashboard } from "@/lib/types";
 
 function buildVipTickerMessages(): string[] {
@@ -100,6 +102,10 @@ export default function VIPPage() {
   const [purchasedPlanName, setPurchasedPlanName] = useState("");
   const [purchasedExpiryDate, setPurchasedExpiryDate] = useState("");
 
+  // 微信支付二维码弹窗状态
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentData, setPaymentData] = useState<CreatePaymentResult | null>(null);
+
   useEffect(() => {
     setMounted(true);
     getVipPlans().then(setPlans).catch(console.error);
@@ -123,32 +129,51 @@ export default function VIPPage() {
     }
     const plan = plans.find((p) => p.id === planId);
     if (!plan) return;
-    if (!window.confirm(`确认支付 ¥${plan.price} 开通 ${plan.name}？`)) return;
+
     setLoading(true);
     try {
-      const orderResult = await createVipOrder(plan.id);
+      // 创建微信支付订单
+      const paymentResult = await createPayment({
+        productType: "vip",
+        productId: planId,
+      });
 
-      // 刷新用户信息以获取最新的VIP状态
-      clearUserCache();
-      const u = await getCurrentUser();
-      setUser(u);
-
-      // 获取仪表盘信息
-      if (u.isVip) {
-        const d = await getVipDashboard();
-        setDashboard({ isTrial: d.isTrial, referralCodeCount: d.referralCodeCount, vipExpiry: d.vipExpiry });
-      }
-
-      // 显示购买成功弹窗 - 优先使用订单返回的新到期时间
+      // 保存支付数据并显示二维码弹窗
+      setPaymentData(paymentResult);
       setPurchasedPlanName(plan.name);
-      setPurchasedExpiryDate(orderResult.newVipExpiry ?? d?.vipExpiry ?? u.vipExpiry ?? "");
-      setShowSuccessModal(true);
+      setShowPaymentModal(true);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) alert("请先登录");
-      else alert(((e as ApiError)?.body as { message?: string })?.message ?? (e as Error)?.message ?? "下单失败");
+      else alert(((e as ApiError)?.body as { message?: string })?.message ?? (e as Error)?.message ?? "创建支付订单失败");
     } finally {
       setLoading(false);
     }
+  };
+
+  // 处理支付成功
+  const handlePaymentSuccess = async (status: { validEndAt?: string }) => {
+    setShowPaymentModal(false);
+
+    // 刷新用户信息以获取最新的VIP状态
+    clearUserCache();
+    const u = await getCurrentUser();
+    setUser(u);
+
+    // 获取仪表盘信息
+    let expiryDate = status.validEndAt;
+    if (u.isVip) {
+      try {
+        const d = await getVipDashboard();
+        setDashboard({ isTrial: d.isTrial, referralCodeCount: d.referralCodeCount, vipExpiry: d.vipExpiry });
+        expiryDate = d.vipExpiry ?? expiryDate;
+      } catch {
+        // 忽略仪表盘错误
+      }
+    }
+
+    // 显示购买成功弹窗
+    setPurchasedExpiryDate(expiryDate ?? u.vipExpiry ?? "");
+    setShowSuccessModal(true);
   };
 
   return (
@@ -412,6 +437,24 @@ export default function VIPPage() {
           </p>
         </div>
       </div>
+
+      {/* 微信支付二维码弹窗 */}
+      {paymentData && (
+        <PaymentQRCodeModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          orderNo={paymentData.orderNo}
+          productName={paymentData.productName}
+          amount={paymentData.amount}
+          originalAmount={paymentData.originalAmount}
+          isFirstMonth={paymentData.isFirstMonth}
+          expiryTime={paymentData.expiryTime}
+          onPaymentSuccess={handlePaymentSuccess}
+          onPaymentExpired={() => {
+            // 订单过期，可以在这里添加重新支付的逻辑
+          }}
+        />
+      )}
 
       {/* 购买成功弹窗 */}
       <PaymentSuccessModal

@@ -9,6 +9,8 @@ import { loadPanExport } from "@/lib/panExportService";
 import { useUser } from "@/components/UserContext";
 import { getVipDashboard } from "@/lib/vipService";
 import { apiFetch } from "@/lib/apiClient";
+import { createPayment, type CreatePaymentResult } from "@/lib/payment";
+import { PaymentQRCodeModal } from "@/components/PaymentQRCodeModal";
 
 function FileIcon({ format }: { format?: string }) {
   const f = (format || "").toLowerCase();
@@ -73,6 +75,10 @@ export default function ExamPage() {
   const [selectedItem, setSelectedItem] = useState<PanFileItem | null>(null);
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const [purchasing, setPurchasing] = useState(false);
+
+  // 微信支付状态
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentData, setPaymentData] = useState<CreatePaymentResult | null>(null);
 
   // 加载用户已购买的资料
   useEffect(() => {
@@ -140,35 +146,43 @@ export default function ExamPage() {
     window.open(item.shareUrl, "_blank");
   };
 
-  // 处理单独购买
+  // 处理单独购买 - 微信支付流程
   const handlePurchase = async () => {
     if (!selectedItem || !user) return;
     setPurchasing(true);
     try {
-      const result = await apiFetch<{
-        orderId: string;
-        materialId: string;
-        alreadyPurchased?: boolean;
-        message: string;
-      }>("/pan-materials/purchase", {
-        method: "POST",
-        json: { materialId: selectedItem.id },
+      // 创建微信支付订单
+      const paymentResult = await createPayment({
+        productType: "material",
+        productId: selectedItem.id,
+        materialId: selectedItem.id,
+        materialName: selectedItem.name,
+        materialPrice: 660, // 6.6元 = 660分
       });
 
-      if (result.alreadyPurchased || result.orderId) {
-        // 模拟支付成功（实际项目中这里应该调用支付接口）
-        setPurchasedIds((prev) => new Set([...prev, selectedItem.id]));
-        setShowPaywall(false);
-        alert(`购买成功！已解锁「${selectedItem.name}」的下载权限`);
-        // 自动打开下载
-        window.open(selectedItem.shareUrl, "_blank");
-      }
+      // 保存支付数据并显示二维码弹窗
+      setPaymentData(paymentResult);
+      setShowPaywall(false); // 关闭当前弹窗
+      setShowPaymentModal(true); // 显示支付二维码弹窗
     } catch (error) {
-      console.error("购买失败:", error);
-      const message = error instanceof Error ? error.message : "购买失败，请稍后重试";
+      console.error("创建支付订单失败:", error);
+      const message = error instanceof Error ? error.message : "创建支付订单失败，请稍后重试";
       alert(message);
     } finally {
       setPurchasing(false);
+    }
+  };
+
+  // 处理支付成功
+  const handlePaymentSuccess = () => {
+    setShowPaymentModal(false);
+
+    // 标记为已购买
+    if (selectedItem) {
+      setPurchasedIds((prev) => new Set([...prev, selectedItem.id]));
+      alert(`购买成功！已解锁「${selectedItem.name}」的下载权限`);
+      // 自动打开下载
+      window.open(selectedItem.shareUrl, "_blank");
     }
   };
 
@@ -396,6 +410,24 @@ export default function ExamPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* 微信支付二维码弹窗 */}
+      {paymentData && (
+        <PaymentQRCodeModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          orderNo={paymentData.orderNo}
+          productName={paymentData.productName}
+          amount={paymentData.amount}
+          originalAmount={paymentData.originalAmount}
+          isFirstMonth={paymentData.isFirstMonth}
+          expiryTime={paymentData.expiryTime}
+          onPaymentSuccess={handlePaymentSuccess}
+          onPaymentExpired={() => {
+            // 订单过期，可以在这里添加重新支付的逻辑
+          }}
+        />
       )}
     </div>
   );
