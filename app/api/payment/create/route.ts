@@ -10,6 +10,10 @@ import {
   isValidProduct,
   type ProductType,
 } from "@/lib/payment-config";
+import {
+  PAYMENT_ORDER_EXPIRY_MS,
+  getPaymentOrderExpiryTime,
+} from "@/lib/payment-constants";
 import { createNativeOrder } from "@/lib/wechat-pay";
 
 const ORDER_RATE_WINDOW = 60;
@@ -65,6 +69,24 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    if (productType === "material") {
+      const existingPurchase = await prisma.panMaterialPurchase.findUnique({
+        where: {
+          userId_materialId: {
+            userId: BigInt(userId),
+            materialId: productId,
+          },
+        },
+      });
+
+      if (existingPurchase?.payStatus === "paid") {
+        return NextResponse.json(
+          { message: "该资料已购买，无需重复下单" },
+          { status: 409 }
+        );
+      }
+    }
+
     // 获取商品价格
     const { price, originalPrice, productName, isFirstMonth } = await getProductPrice(
       productType as ProductType,
@@ -72,6 +94,10 @@ export async function POST(request: NextRequest) {
       BigInt(userId),
       materialPrice
     );
+    const finalProductName =
+      productType === "material" && materialName?.trim()
+        ? materialName.trim()
+        : productName;
 
     // 检查是否有未完成的相同商品订单（幂等性）
     const existingOrder = await prisma.order.findFirst({
@@ -81,7 +107,7 @@ export async function POST(request: NextRequest) {
         productId,
         payStatus: "pending",
         createdAt: {
-          gte: new Date(Date.now() - 30 * 60 * 1000), // 30分钟内
+          gte: new Date(Date.now() - PAYMENT_ORDER_EXPIRY_MS),
         },
       },
     });
@@ -103,7 +129,7 @@ export async function POST(request: NextRequest) {
           isFirstMonth: productType === "vip" && productId === "1_month" && existingOrder.amount === 580,
           qrcodeUrl: existingOrder.wxCodeUrl,
           qrcodeImageUrl: `/api/payment/qrcode/${existingOrder.orderNo}`,
-          expiryTime: Math.floor(new Date(existingOrder.createdAt).getTime() / 1000) + 5 * 60, // 5分钟过期
+          expiryTime: getPaymentOrderExpiryTime(existingOrder.createdAt),
         },
       });
     }
@@ -143,7 +169,7 @@ export async function POST(request: NextRequest) {
 
     try {
       const wxOrder = await createNativeOrder({
-        description: productName,
+        description: finalProductName,
         outTradeNo: orderNo,
         amount: price,
         notifyUrl,
@@ -179,7 +205,7 @@ export async function POST(request: NextRequest) {
         userId: BigInt(userId),
         productType,
         productId,
-        productName,
+        productName: finalProductName,
         amount: price,
         originalAmount: originalPrice,
         payStatus: "pending",
@@ -210,7 +236,7 @@ export async function POST(request: NextRequest) {
         isFirstMonth,
         qrcodeUrl: order.wxCodeUrl,
         qrcodeImageUrl: `/api/payment/qrcode/${order.orderNo}`,
-        expiryTime: Math.floor(Date.now() / 1000) + 5 * 60, // 5分钟过期
+        expiryTime: getPaymentOrderExpiryTime(order.createdAt),
       },
     });
   } catch (error) {

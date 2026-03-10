@@ -105,3 +105,30 @@ WECHAT_PAY_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----
 3. 閰嶇疆鐢熶骇鐜寰俊鏀粯鍙傛暟
 4. 鐢熶骇鐜閮ㄧ讲
 
+
+---
+
+## Session: 2026-03-10 微信支付/登录巡检
+
+### Phase 1: 巡检与诊断
+- **Status:** complete
+- **Completed:** 2026-03-10
+- **Findings:**
+  1. `payment/create` 会复用 30 分钟内的待支付订单，但二维码接口只允许 5 分钟内访问，导致返回“已过期”的旧订单。
+  2. PC 扫码登录成功后只写入了 Session，未同步写入 `campus_api_secret`，会影响后续受保护接口的签名请求。
+  3. 资料单买路径未拦截已购资料，且支付回调使用 `create` 写入 `pan_material_purchase`，在历史记录/重复通知场景下可能触发唯一约束错误。
+  4. 资料支付订单忽略了前端传入的 `materialName`，支付弹窗和订单记录会退化成通用名称“笔面试资料”。
+
+### Phase 2: 修复与回归
+- **Status:** in_progress
+- **Started:** 2026-03-10
+- **Tasks:**
+  - [x] 统一支付订单有效期常量
+  - [x] 修复待支付订单复用窗口
+  - [x] 为 PC 扫码登录补充 API Secret Cookie
+  - [x] 修复资料购买幂等与回调 upsert
+  - [x] 修正文档中的真实配置示例
+  - [ ] 执行定向校验
+- **Validation:** `npx eslint` (针对变更文件) 通过；`npx tsc --noEmit` 仍被仓库既有 E2E 类型错误阻塞。
+- [x] 修复 Playwright API E2E 类型错误
+- **Validation:** `npx tsc --noEmit` 与定向 `npx eslint` 已通过。

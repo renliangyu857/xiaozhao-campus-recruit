@@ -11,6 +11,7 @@ import {
   getQRCodeImageUrl,
   type OrderStatus,
 } from "@/lib/payment";
+import { PAYMENT_ORDER_EXPIRY_SECONDS } from "@/lib/payment-constants";
 
 interface PaymentQRCodeModalProps {
   isOpen: boolean;
@@ -74,7 +75,7 @@ export function PaymentQRCodeModal({
       try {
         const orderStatus = await pollOrderStatus(orderNo, {
           interval: 2000,
-          maxAttempts: 150, // 5分钟
+          maxAttempts: Math.ceil((PAYMENT_ORDER_EXPIRY_SECONDS * 1000) / 2000),
         });
 
         if (cancelled) return;
@@ -200,7 +201,7 @@ export function PaymentQRCodeModal({
                 </div>
 
                 <p className="text-slate-600 mb-2">请使用微信扫一扫</p>
-                <p className="text-slate-400 text-sm">二维码有效期5分钟</p>
+                <p className="text-slate-400 text-sm">二维码有效期{PAYMENT_ORDER_EXPIRY_SECONDS / 60}分钟</p>
 
                 {/* 刷新按钮 */}
                 <button

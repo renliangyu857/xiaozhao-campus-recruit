@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateQRCode } from "@/lib/wechat-pay";
 import { logger } from "@/lib/logger";
+import { PAYMENT_ORDER_EXPIRY_MS } from "@/lib/payment-constants";
 
 /**
  * GET /api/payment/qrcode/:orderNo
@@ -33,7 +34,7 @@ export async function GET(
 
     // 检查订单是否过期（5分钟）
     const orderAge = Date.now() - new Date(order.createdAt).getTime();
-    if (orderAge > 5 * 60 * 1000) {
+    if (orderAge > PAYMENT_ORDER_EXPIRY_MS) {
       return NextResponse.json(
         { message: "订单已过期，请重新创建" },
         { status: 400 }

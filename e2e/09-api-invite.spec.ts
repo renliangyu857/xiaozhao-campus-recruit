@@ -1,8 +1,8 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type APIRequestContext } from '@playwright/test';
 
 const API_BASE = process.env.E2E_API_BASE || 'http://localhost:3000/api';
 
-async function loginAndGetHeaders(request: typeof test.request): Promise<Record<string, string>> {
+async function loginAndGetHeaders(request: APIRequestContext): Promise<Record<string, string>> {
   const testCode = 'test_invite_' + Date.now() + '_' + Math.random().toString(36).substring(7);
   const loginRes = await request.get(`${API_BASE}/auth/wechat/login?code=${testCode}`);
   expect(loginRes.status()).toBe(200);

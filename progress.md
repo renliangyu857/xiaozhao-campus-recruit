@@ -43,6 +43,9 @@
 - **Completed:** 2026-03-09
 - **Routes:** æ–°å¢ž `/api/payment/*` è·¯ç”±
 
+### Gitæäº¤
+- **Commit:** `fc37c84` feat: æŽ¥å…¥å¾®ä¿¡Nativeæ”¯ä»˜ï¼ˆæ‰«ç æ”¯ä»˜ï¼‰
+
 ### Files Modified
 
 | æ–‡ä»¶ | å˜æ›´ç±»åž‹ | è¯´æ˜Ž |
@@ -98,6 +101,26 @@
 | `successTime`å¯èƒ½ä¸ºundefined | 1 | `successTime ? new Date(successTime) : new Date()` |
 | `qrcode`ç±»åž‹å£°æ˜Žç¼ºå¤± | 1 | `npm install --save-dev @types/qrcode` |
 | `getPrice`/`price`ç±»åž‹é”™è¯¯ | 1 | ä½¿ç”¨ç±»åž‹æ–­è¨€ |
+
+## å¾…é…ç½®çš„çŽ¯å¢ƒå˜é‡
+
+åœ¨éƒ¨ç½²å‰ï¼Œéœ€è¦åœ¨ `.env.local` æˆ–ç”Ÿäº§çŽ¯å¢ƒé…ç½®ä»¥ä¸‹å˜é‡ï¼š
+
+```bash
+# å¾®ä¿¡æ”¯ä»˜é…ç½®
+WECHAT_PAY_MCHID=å•†æˆ·å·
+WECHAT_PAY_APPID=å…¬ä¼—å·APPID
+WECHAT_PAY_APIV3_KEY=APIv3å¯†é’¥
+WECHAT_PAY_CERT_SERIAL_NO=è¯ä¹¦åºåˆ—å·
+WECHAT_PAY_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----
+...
+-----END PRIVATE KEY-----
+
+# å¾®ä¿¡æ”¯ä»˜å…¬é’¥ï¼ˆå›žè°ƒéªŒç­¾ç”¨ï¼‰
+WECHAT_PAY_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----
+...
+-----END PUBLIC KEY-----
+```
 
 ## Test Plan
 
@@ -157,3 +180,10 @@
 ### 2026-02-24 ~ 2026-02-28: ç½‘ç›˜èµ„æ–™åŠŸèƒ½ä¸ŽE2Eä¿®å¤
 - å®Œæˆç¬”é¢è¯•èµ„æ–™é¡µé¢ï¼ˆ/examï¼‰
 - ä¿®å¤6ä¸ªE2Eå¤±è´¥ç”¨ä¾‹
+
+### 2026-03-10
+- Æô¶¯Î¢ÐÅÖ§¸¶/µÇÂ¼Ñ²¼ì£¬¸´ºË `payment/create`¡¢`payment/notify`¡¢`auth/qrcode/poll`¡¢`wechat/callback` µÈ¹Ø¼üÂ·¾¶¡£
+- ÒÑÐÞ¸´Ö§¸¶ÓÐÐ§ÆÚ²»Ò»ÖÂ¡¢×ÊÁÏ¹ºÂò»Øµ÷ÃÝµÈ¡¢PC É¨ÂëµÇÂ¼È±ÉÙ API Secret Cookie¡¢×ÊÁÏ¶©µ¥Ãû³Æ¶ªÊ§µÈÎÊÌâ¡£
+- ÒÑÍ¬²½¸üÐÂ `docs/Î¢ÐÅµÇÂ¼ÅäÖÃËµÃ÷.md`£¬ÒÆ³ýÕæÊµÅäÖÃÊ¾Àý²¢¸ÄÎªÕ¼Î»·û¡£
+- ¶¨ÏòÐ£Ñé£º`npx eslint` ÒÑÍ¨¹ý£¨½ö Markdown ÎÄ¼þ±» ESLint ºöÂÔ£©£»`npx tsc --noEmit` ÈÔ±»¼ÈÓÐ E2E ÓÃÀý `test.request` ÀàÐÍ´íÎó×èÈû£¬Î´¼û±¾´Î¸Ä¶¯ÐÂÔö±¨´í¡£
+- ÒÑÐÞ¸´ 4 ¸ö API E2E ÓÃÀýµÄ Playwright `request` ÀàÐÍÉùÃ÷£¨¸ÄÎª `APIRequestContext`£©£¬`npx tsc --noEmit` Óë¶¨Ïò `npx eslint` ÏÖÒÑÍ¨¹ý¡£

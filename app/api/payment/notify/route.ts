@@ -166,13 +166,26 @@ export async function POST(request: NextRequest) {
 
       // 处理资料订单
       if (order.productType === "material") {
-        // 创建资料购买记录
-        await tx.panMaterialPurchase.create({
-          data: {
+        // 创建或更新资料购买记录，兼容历史 pending 记录和重复通知
+        await tx.panMaterialPurchase.upsert({
+          where: {
+            userId_materialId: {
+              userId: order.userId,
+              materialId: order.productId,
+            },
+          },
+          update: {
+            materialName: order.productName,
+            price: order.amount / 100,
+            orderNo: order.orderNo,
+            payStatus: "paid",
+            paidAt: successTime ? new Date(successTime) : new Date(),
+          },
+          create: {
             userId: order.userId,
             materialId: order.productId,
             materialName: order.productName,
-            price: order.amount / 100, // 分转元
+            price: order.amount / 100,
             orderNo: order.orderNo,
             payStatus: "paid",
             paidAt: successTime ? new Date(successTime) : new Date(),

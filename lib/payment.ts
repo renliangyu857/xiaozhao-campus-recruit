@@ -1,4 +1,5 @@
 import { apiFetch } from "./apiClient";
+import { PAYMENT_ORDER_EXPIRY_SECONDS } from "./payment-constants";
 
 /**
  * 创建支付订单
@@ -78,13 +79,8 @@ export async function pollOrderStatus(
     maxAttempts?: number;
   } = {}
 ): Promise<OrderStatus> {
-  const {
-    onSuccess,
-    onExpired,
-    onError,
-    interval = 2000,
-    maxAttempts = 150, // 默认5分钟 (150 * 2s = 300s)
-  } = options;
+  const { onSuccess, onExpired, onError, interval = 2000, maxAttempts } = options;
+  const resolvedMaxAttempts = maxAttempts ?? Math.ceil((PAYMENT_ORDER_EXPIRY_SECONDS * 1000) / interval);
 
   return new Promise((resolve, reject) => {
     let attempts = 0;
@@ -106,7 +102,7 @@ export async function pollOrderStatus(
         }
 
         // 检查是否超时
-        if (attempts >= maxAttempts) {
+        if (attempts >= resolvedMaxAttempts) {
           onExpired?.();
           reject(new Error("支付超时，请重新下单"));
           return;
@@ -117,7 +113,7 @@ export async function pollOrderStatus(
       } catch (error) {
         onError?.(error as Error);
 
-        if (attempts >= maxAttempts) {
+        if (attempts >= resolvedMaxAttempts) {
           reject(error);
           return;
         }

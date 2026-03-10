@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLoginTicket } from "@/lib/wechatTicket";
-import { setSessionUserId } from "@/lib/session";
+import { setSessionUserId, setUserApiSecret } from "@/lib/session";
 import { invalidateAuthCurrentCache } from "@/lib/cache";
 
 /**
@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
 
     // 设置 cookie
     await setSessionUserId(userId);
+    await setUserApiSecret(userId);
     await invalidateAuthCurrentCache(userId);
 
     return res;
