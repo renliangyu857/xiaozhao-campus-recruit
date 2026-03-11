@@ -2,6 +2,28 @@ import { signedFetch } from "./client-api-sign";
 
 const API_BASE = typeof window !== "undefined" ? "/api" : process.env.NEXT_PUBLIC_API_BASE ?? "/api";
 
+function buildApiUrl(path: string): string {
+  const trimmedBase = API_BASE.endsWith("/") ? API_BASE.slice(0, -1) : API_BASE;
+
+  if (!path) {
+    return trimmedBase;
+  }
+
+  const normalizedPath = path.startsWith("/api/")
+    ? path.slice(4)
+    : path === "/api"
+      ? ""
+      : path;
+
+  if (!normalizedPath) {
+    return trimmedBase;
+  }
+
+  return normalizedPath.startsWith("/")
+    ? `${trimmedBase}${normalizedPath}`
+    : `${trimmedBase}/${normalizedPath}`;
+}
+
 export class ApiError extends Error {
   status: number;
   body: unknown;
@@ -23,7 +45,7 @@ export async function apiFetch<T>(
     body = JSON.stringify(init.json);
   }
 
-  const url = `${API_BASE}${path}`;
+  const url = buildApiUrl(path);
 
   // 客户端使用签名请求，服务端使用普通 fetch
   const resp = typeof window !== "undefined"

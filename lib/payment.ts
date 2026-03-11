@@ -25,7 +25,7 @@ export interface CreatePaymentResult {
 
 export async function createPayment(params: CreatePaymentParams): Promise<CreatePaymentResult> {
   const response = await apiFetch<{ success: boolean; data: CreatePaymentResult }>(
-    "/api/payment/create",
+    "/payment/create",
     {
       method: "POST",
       json: params,
@@ -56,7 +56,7 @@ export interface OrderStatus {
 
 export async function queryOrderStatus(orderNo: string): Promise<OrderStatus> {
   const response = await apiFetch<{ success: boolean; data: OrderStatus }>(
-    `/api/payment/order/${orderNo}`
+    `/payment/order/${orderNo}`
   );
 
   if (!response.success) {
