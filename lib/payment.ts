@@ -1,4 +1,4 @@
-import { apiFetch } from "./apiClient";
+﻿import { apiFetch } from "./apiClient";
 import { PAYMENT_ORDER_EXPIRY_SECONDS } from "./payment-constants";
 
 /**
@@ -21,6 +21,34 @@ export interface CreatePaymentResult {
   qrcodeUrl: string;
   qrcodeImageUrl: string;
   expiryTime: number;
+}
+
+export interface PaymentOrderSummary {
+  orderNo: string;
+  productType: string;
+  productId: string;
+  productName: string;
+  amount: number;
+  originalAmount?: number;
+  payStatus: "pending" | "paid" | "failed" | "cancelled" | "closed" | string;
+  bizStatus: string;
+  payTime?: string;
+  createdAt: string;
+  validEndAt?: string;
+}
+
+export interface PaymentOrderDetail extends PaymentOrderSummary {
+  wxTransactionId?: string;
+  notifyCount?: number;
+  lastNotifyAt?: string;
+  canRefresh?: boolean;
+}
+
+export interface PaymentOrdersResponse {
+  total: number;
+  pendingCount: number;
+  paidCount: number;
+  items: PaymentOrderSummary[];
 }
 
 export async function createPayment(params: CreatePaymentParams): Promise<CreatePaymentResult> {
@@ -66,6 +94,49 @@ export async function queryOrderStatus(orderNo: string): Promise<OrderStatus> {
   return response.data;
 }
 
+export async function fetchPaymentOrders(params?: {
+  status?: string;
+  productType?: string;
+  limit?: number;
+}): Promise<PaymentOrdersResponse> {
+  const searchParams = new URLSearchParams();
+
+  if (params?.status && params.status !== "all") {
+    searchParams.set("status", params.status);
+  }
+
+  if (params?.productType && params.productType !== "all") {
+    searchParams.set("productType", params.productType);
+  }
+
+  if (params?.limit) {
+    searchParams.set("limit", String(params.limit));
+  }
+
+  const query = searchParams.toString();
+  const response = await apiFetch<{ success: boolean; data: PaymentOrdersResponse }>(
+    `/payment/orders${query ? `?${query}` : ""}`
+  );
+
+  if (!response.success) {
+    throw new Error("查询订单列表失败");
+  }
+
+  return response.data;
+}
+
+export async function fetchPaymentOrder(orderNo: string): Promise<PaymentOrderDetail> {
+  const response = await apiFetch<{ success: boolean; data: PaymentOrderDetail }>(
+    `/payment/order/${orderNo}?t=${Date.now()}`
+  );
+
+  if (!response.success) {
+    throw new Error("查询订单详情失败");
+  }
+
+  return response.data;
+}
+
 /**
  * 轮询查询订单状态
  */
@@ -101,14 +172,12 @@ export async function pollOrderStatus(
           return;
         }
 
-        // 检查是否超时
         if (attempts >= resolvedMaxAttempts) {
           onExpired?.();
           reject(new Error("支付超时，请重新下单"));
           return;
         }
 
-        // 继续轮询
         setTimeout(check, interval);
       } catch (error) {
         onError?.(error as Error);
@@ -118,7 +187,6 @@ export async function pollOrderStatus(
           return;
         }
 
-        // 错误后继续轮询
         setTimeout(check, interval);
       }
     };
@@ -142,8 +210,8 @@ export function formatAmount(amount: number): string {
 }
 
 /**
- * 计算倒计时（秒）
+ * 计算倒计时秒数
  */
 export function calculateCountdown(expiryTime: number): number {
-  return Math.max(0, expiryTime - Math.floor(Date.now() / 1000));
+  return Math.max(0, Math.ceil((expiryTime - Date.now()) / 1000));
 }

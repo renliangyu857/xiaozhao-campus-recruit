@@ -132,3 +132,19 @@ WECHAT_PAY_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----
 - **Validation:** `npx eslint` (针对变更文件) 通过；`npx tsc --noEmit` 仍被仓库既有 E2E 类型错误阻塞。
 - [x] 修复 Playwright API E2E 类型错误
 - **Validation:** `npx tsc --noEmit` 与定向 `npx eslint` 已通过。
+
+## Session: 2026-03-12 支付可观测性与订单中心规划
+
+### Phase 1: 方案评估
+- **Status:** complete
+- **Completed:** 2026-03-12
+- **Conclusion:** 应补齐支付全链路日志与用户侧订单记录查询，优先级高于继续扩展支付入口。
+
+### Phase 2: 待实施范围
+- **Status:** pending
+- **Tasks:**
+  - [ ] 补齐支付链路结构化日志与追踪字段
+  - [ ] 增加支付异常告警与运营排障视图
+  - [ ] 提供用户侧订单记录列表与详情页
+  - [ ] 提供订单状态手动刷新/补单查询能力
+  - [ ] 提供退款、失败、超时等状态说明文案

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -11,6 +11,7 @@ import {
   KeyRound,
   Gift,
   FileText,
+  ReceiptText,
   Cat,
   LogOut,
   ChevronDown,
@@ -30,7 +31,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
 
   const isActive = (path: string) => pathname === path;
 
-  // 点击外部关闭下拉菜单
+  // 鐐瑰嚮澶栭儴鍏抽棴涓嬫媺鑿滃崟
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
@@ -74,7 +75,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                 }`}
               >
-                <List size={16} /> 职位查询
+                <List size={16} /> 鑱屼綅鏌ヨ
               </Link>
               <Link
                 href="/progress"
@@ -84,7 +85,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                 }`}
               >
-                <BarChart3 size={16} /> 进度统计
+                <BarChart3 size={16} /> 杩涘害缁熻
               </Link>
               <Link
                 href="/exam"
@@ -94,7 +95,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                 }`}
               >
-                <FileText size={16} /> 笔面试资料
+                <FileText size={16} /> 绗旈潰璇曡祫鏂?
               </Link>
               {user?.isVip && (
                 <Link
@@ -105,7 +106,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                       : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                   }`}
                 >
-                  <KeyRound size={16} /> 内推码
+                  <KeyRound size={16} /> 鍐呮帹鐮?
                 </Link>
               )}
               {user && (
@@ -117,7 +118,19 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                       : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                   }`}
                 >
-                  <Gift size={16} /> 邀请有礼
+                  <Gift size={16} /> 閭€璇锋湁绀?
+                </Link>
+              )}
+              {user && (
+                <Link
+                  href="/orders"
+                  className={`px-4 py-2 rounded-full text-sm transition-all duration-200 flex items-center gap-2 ${
+                    isActive("/orders")
+                      ? "text-[#FF6B4A] font-semibold bg-[#FF6B4A]/10"
+                      : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
+                  }`}
+                >
+                  <ReceiptText size={16} /> 我的订单
                 </Link>
               )}
               <Link
@@ -128,7 +141,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                 }`}
               >
-                <Crown size={16} className={user?.isVip ? "text-amber-500 fill-amber-500" : ""} /> 会员中心
+                <Crown size={16} className={user?.isVip ? "text-amber-500 fill-amber-500" : ""} /> 浼氬憳涓績
               </Link>
             </div>
           </div>
@@ -142,7 +155,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     <Crown size={12} className="fill-amber-500 text-amber-500" /> VIP
                   </span>
                 )}
-                {/* 用户下拉菜单 */}
+                {/* 鐢ㄦ埛涓嬫媺鑿滃崟 */}
                 <div className="relative" ref={userMenuRef}>
                   <button
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
@@ -170,7 +183,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     />
                   </button>
 
-                  {/* 下拉菜单 */}
+                  {/* 涓嬫媺鑿滃崟 */}
                   {isUserMenuOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-[#E8E8E8] py-2 animate-fade-in-down">
                       <div className="px-4 py-3 border-b border-[#E8E8E8]/60">
@@ -179,12 +192,20 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                           {user.isVip ? "VIP 会员" : "普通用户"}
                         </p>
                       </div>
+                      <Link
+                        href="/orders"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-[#5D6D7E] transition-colors hover:bg-[#FF6B4A]/5 hover:text-[#FF6B4A]"
+                      >
+                        <ReceiptText size={16} />
+                        我的订单
+                      </Link>
                       <button
                         onClick={handleLogout}
                         className="w-full px-4 py-2.5 text-left text-sm text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5 transition-colors flex items-center gap-2"
                       >
                         <LogOut size={16} />
-                        退出登录
+                        閫€鍑虹櫥褰?
                       </button>
                     </div>
                   )}
@@ -195,7 +216,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                 onClick={onLogin}
                 className="btn btn-primary shadow-lg shadow-orange-200"
               >
-                微信登录
+                寰俊鐧诲綍
               </button>
             )}
           </div>
@@ -206,49 +227,58 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
       <div className="md:hidden flex justify-around border-t border-[#E8E8E8]/60 bg-white/95 backdrop-blur-sm fixed bottom-0 w-full pt-2 pb-safe z-50 shadow-[0_-4px_20px_-5px_rgba(44,62,80,0.08)]">
         <Link
           href="/"
-          className={`flex flex-col items-center p-2 rounded-xl w-16 transition-all ${pathname === "/" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
+          className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
         >
           <List size={22} strokeWidth={pathname === "/" ? 2.5 : 2} />
-          <span className="text-[10px] font-semibold mt-1">职位</span>
+          <span className="text-[10px] font-semibold mt-1">鑱屼綅</span>
         </Link>
         <Link
           href="/progress"
-          className={`flex flex-col items-center p-2 rounded-xl w-16 transition-all ${pathname === "/progress" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
+          className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/progress" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
         >
           <BarChart3 size={22} strokeWidth={pathname === "/progress" ? 2.5 : 2} />
-          <span className="text-[10px] font-semibold mt-1">进度</span>
+          <span className="text-[10px] font-semibold mt-1">杩涘害</span>
         </Link>
         <Link
           href="/exam"
-          className={`flex flex-col items-center p-2 rounded-xl w-16 transition-all ${pathname === "/exam" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
+          className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/exam" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
         >
           <FileText size={22} strokeWidth={pathname === "/exam" ? 2.5 : 2} />
-          <span className="text-[10px] font-semibold mt-1">资料</span>
+          <span className="text-[10px] font-semibold mt-1">璧勬枡</span>
         </Link>
         {user?.isVip && (
           <Link
             href="/referral-codes"
-            className={`flex flex-col items-center p-2 rounded-xl w-16 transition-all ${pathname === "/referral-codes" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
+            className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/referral-codes" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
           >
             <KeyRound size={22} strokeWidth={pathname === "/referral-codes" ? 2.5 : 2} />
-            <span className="text-[10px] font-semibold mt-1">内推</span>
+            <span className="text-[10px] font-semibold mt-1">鍐呮帹</span>
           </Link>
         )}
         {user && (
           <Link
             href="/invite"
-            className={`flex flex-col items-center p-2 rounded-xl w-16 transition-all ${pathname === "/invite" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
+            className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/invite" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
           >
             <Gift size={22} strokeWidth={pathname === "/invite" ? 2.5 : 2} />
             <span className="text-[10px] font-semibold mt-1">邀请</span>
           </Link>
         )}
+        {user && (
+          <Link
+            href="/orders"
+            className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/orders" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
+          >
+            <ReceiptText size={22} strokeWidth={pathname === "/orders" ? 2.5 : 2} />
+            <span className="text-[10px] font-semibold mt-1">订单</span>
+          </Link>
+        )}
         <Link
           href="/vip"
-          className={`flex flex-col items-center p-2 rounded-xl w-16 transition-all ${pathname === "/vip" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
+          className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/vip" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
         >
           <Crown size={22} strokeWidth={pathname === "/vip" ? 2.5 : 2} className={user?.isVip ? "text-amber-500 fill-amber-500" : ""} />
-          <span className="text-[10px] font-semibold mt-1">会员</span>
+          <span className="text-[10px] font-semibold mt-1">浼氬憳</span>
         </Link>
       </div>
     </nav>

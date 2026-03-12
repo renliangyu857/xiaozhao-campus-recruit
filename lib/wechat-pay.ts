@@ -1,11 +1,11 @@
-/**
- * 微信支付工具 - Native支付
- * 参考文档: https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_4_1.shtml
+﻿/**
+ * 寰俊鏀粯宸ュ叿 - Native鏀粯
+ * 鍙傝€冩枃妗? https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_4_1.shtml
  */
 
 import crypto from "crypto";
 
-// 微信支付配置
+// 寰俊鏀粯閰嶇疆
 const WECHAT_PAY_CONFIG = {
   mchid: process.env.WECHAT_PAY_MCHID || "",
   appid: process.env.WECHAT_PAY_APPID || "",
@@ -15,12 +15,11 @@ const WECHAT_PAY_CONFIG = {
   publicKey: process.env.WECHAT_PAY_PUBLIC_KEY || "",
 };
 
-// 微信支付API基础URL
+// 寰俊鏀粯API鍩虹URL
 const WECHAT_PAY_BASE_URL = "https://api.mch.weixin.qq.com";
 
 /**
- * 检查微信支付配置是否完整
- */
+ * 妫€鏌ュ井淇℃敮浠橀厤缃槸鍚﹀畬鏁? */
 export function validateWechatPayConfig(): { valid: boolean; missing: string[] } {
   const missing: string[] = [];
 
@@ -35,8 +34,7 @@ export function validateWechatPayConfig(): { valid: boolean; missing: string[] }
 }
 
 /**
- * 生成随机字符串
- */
+ * 鐢熸垚闅忔満瀛楃涓? */
 function generateNonceStr(length: number = 32): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let result = "";
@@ -47,15 +45,13 @@ function generateNonceStr(length: number = 32): string {
 }
 
 /**
- * 生成时间戳
- */
+ * 鐢熸垚鏃堕棿鎴? */
 function generateTimestamp(): string {
   return Math.floor(Date.now() / 1000).toString();
 }
 
 /**
- * 生成签名（RSA-SHA256）
- * 参考: https://pay.weixin.qq.com/wiki/doc/apiv3/wechatpay/wechatpay4_0.shtml
+ * 鐢熸垚绛惧悕锛圧SA-SHA256锛? * 鍙傝€? https://pay.weixin.qq.com/wiki/doc/apiv3/wechatpay/wechatpay4_0.shtml
  */
 function generateSignature(method: string, url: string, timestamp: string, nonceStr: string, body: string): string {
   const message = `${method}\n${url}\n${timestamp}\n${nonceStr}\n${body}\n`;
@@ -70,7 +66,7 @@ function generateSignature(method: string, url: string, timestamp: string, nonce
 }
 
 /**
- * 验证微信回调签名
+ * 楠岃瘉寰俊鍥炶皟绛惧悕
  */
 export function verifyWechatSignature(
   timestamp: string,
@@ -97,8 +93,7 @@ export function verifyWechatSignature(
 }
 
 /**
- * 构建请求头
- */
+ * 鏋勫缓璇锋眰澶? */
 function buildHeaders(method: string, urlPath: string, body: string = ""): Record<string, string> {
   const timestamp = generateTimestamp();
   const nonceStr = generateNonceStr();
@@ -114,26 +109,26 @@ function buildHeaders(method: string, urlPath: string, body: string = ""): Recor
 }
 
 /**
- * Native支付统一下单
- * 参考: https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_4_1.shtml
+ * Native鏀粯缁熶竴涓嬪崟
+ * 鍙傝€? https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_4_1.shtml
  */
 export interface NativeOrderParams {
   description: string;
   outTradeNo: string;
-  amount: number; // 单位：分
+  amount: number; // 鍗曚綅锛氬垎
   notifyUrl: string;
   clientIp?: string;
 }
 
 export interface NativeOrderResult {
-  codeUrl: string; // 二维码URL
+  codeUrl: string; // 浜岀淮鐮乁RL
   prepayId: string;
 }
 
 export async function createNativeOrder(params: NativeOrderParams): Promise<NativeOrderResult> {
   const { valid, missing } = validateWechatPayConfig();
   if (!valid) {
-    throw new Error(`微信支付配置缺失: ${missing.join(", ")}`);
+    throw new Error(`寰俊鏀粯閰嶇疆缂哄け: ${missing.join(", ")}`);
   }
 
   const urlPath = "/v3/pay/transactions/native";
@@ -174,7 +169,7 @@ export async function createNativeOrder(params: NativeOrderParams): Promise<Nati
 
   if (!response.ok) {
     console.error("[WechatPay] Create order failed:", responseText);
-    throw new Error(`创建微信支付订单失败: ${responseText}`);
+    throw new Error(`鍒涘缓寰俊鏀粯璁㈠崟澶辫触: ${responseText}`);
   }
 
   const data = JSON.parse(responseText);
@@ -191,8 +186,7 @@ export async function createNativeOrder(params: NativeOrderParams): Promise<Nati
 }
 
 /**
- * 查询订单状态
- * 参考: https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_4_2.shtml
+ * 鏌ヨ璁㈠崟鐘舵€? * 鍙傝€? https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_4_2.shtml
  */
 export interface QueryOrderResult {
   tradeState: string; // SUCCESS, REFUND, NOTPAY, CLOSED, REVOKED, USERPAYING, PAYERROR
@@ -208,7 +202,7 @@ export interface QueryOrderResult {
 export async function queryOrder(outTradeNo: string): Promise<QueryOrderResult> {
   const { valid, missing } = validateWechatPayConfig();
   if (!valid) {
-    throw new Error(`微信支付配置缺失: ${missing.join(", ")}`);
+    throw new Error(`寰俊鏀粯閰嶇疆缂哄け: ${missing.join(", ")}`);
   }
 
   const urlPath = `/v3/pay/transactions/out-trade-no/${outTradeNo}?mchid=${WECHAT_PAY_CONFIG.mchid}`;
@@ -225,7 +219,7 @@ export async function queryOrder(outTradeNo: string): Promise<QueryOrderResult> 
 
   if (!response.ok) {
     console.error("[WechatPay] Query order failed:", responseText);
-    throw new Error(`查询订单失败: ${responseText}`);
+    throw new Error(`鏌ヨ璁㈠崟澶辫触: ${responseText}`);
   }
 
   const data = JSON.parse(responseText);
@@ -240,13 +234,13 @@ export async function queryOrder(outTradeNo: string): Promise<QueryOrderResult> 
 }
 
 /**
- * 关闭订单
- * 参考: https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_4_3.shtml
+ * 鍏抽棴璁㈠崟
+ * 鍙傝€? https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_4_3.shtml
  */
 export async function closeOrder(outTradeNo: string): Promise<void> {
   const { valid, missing } = validateWechatPayConfig();
   if (!valid) {
-    throw new Error(`微信支付配置缺失: ${missing.join(", ")}`);
+    throw new Error(`寰俊鏀粯閰嶇疆缂哄け: ${missing.join(", ")}`);
   }
 
   const urlPath = `/v3/pay/transactions/out-trade-no/${outTradeNo}/close`;
@@ -267,15 +261,15 @@ export async function closeOrder(outTradeNo: string): Promise<void> {
   if (!response.ok) {
     const responseText = await response.text();
     console.error("[WechatPay] Close order failed:", responseText);
-    throw new Error(`关闭订单失败: ${responseText}`);
+    throw new Error(`鍏抽棴璁㈠崟澶辫触: ${responseText}`);
   }
 
   console.log("[WechatPay] Order closed:", outTradeNo);
 }
 
 /**
- * 解析支付回调通知
- * 参考: https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_4_5.shtml
+ * 瑙ｆ瀽鏀粯鍥炶皟閫氱煡
+ * 鍙傝€? https://pay.weixin.qq.com/wiki/doc/apiv3/apis/chapter3_4_5.shtml
  */
 export interface PaymentNotification {
   id: string;
@@ -291,7 +285,7 @@ export interface PaymentNotification {
 }
 
 /**
- * 解密后的支付通知数据
+ * 瑙ｅ瘑鍚庣殑鏀粯閫氱煡鏁版嵁
  */
 export interface DecryptedPaymentNotification {
   out_trade_no: string;
@@ -304,7 +298,7 @@ export interface DecryptedPaymentNotification {
 }
 
 /**
- * 解密回调数据
+ * 瑙ｅ瘑鍥炶皟鏁版嵁
  */
 export function decryptNotification(
   ciphertext: string,
@@ -313,11 +307,10 @@ export function decryptNotification(
 ): DecryptedPaymentNotification {
   const key = Buffer.from(WECHAT_PAY_CONFIG.apiV3Key, "utf8");
   const iv = Buffer.from(nonce, "utf8");
-
-  // 构建AAD（Additional Authenticated Data）
-  const authTag = Buffer.from(ciphertext.slice(-32), "hex");
-  const encryptedData = Buffer.from(ciphertext.slice(0, -32), "hex");
-  const aad = Buffer.from(associatedData, "utf8");
+  const ciphertextBuffer = Buffer.from(ciphertext, "base64");
+  const authTag = ciphertextBuffer.subarray(ciphertextBuffer.length - 16);
+  const encryptedData = ciphertextBuffer.subarray(0, ciphertextBuffer.length - 16);
+  const aad = Buffer.from(associatedData || "", "utf8");
 
   try {
     const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
@@ -330,17 +323,15 @@ export function decryptNotification(
     return JSON.parse(decrypted);
   } catch (error) {
     console.error("[WechatPay] Decrypt notification failed:", error);
-    throw new Error("解密通知数据失败");
+    throw new Error("瑙ｅ瘑閫氱煡鏁版嵁澶辫触");
   }
 }
 
 /**
- * 生成二维码图片（使用Google Charts API或本地生成）
- * 这里使用 qrcode 库
- */
+ * 鐢熸垚浜岀淮鐮佸浘鐗囷紙浣跨敤Google Charts API鎴栨湰鍦扮敓鎴愶級
+ * 杩欓噷浣跨敤 qrcode 搴? */
 export async function generateQRCode(codeUrl: string): Promise<Buffer> {
-  // 动态导入 qrcode 库
-  const QRCode = await import("qrcode");
+  // 鍔ㄦ€佸鍏?qrcode 搴?  const QRCode = await import("qrcode");
 
   return QRCode.toBuffer(codeUrl, {
     type: "png",
@@ -354,8 +345,7 @@ export async function generateQRCode(codeUrl: string): Promise<Buffer> {
 }
 
 /**
- * 沙箱环境开关
- */
+ * 娌欑鐜寮€鍏? */
 export function isSandboxMode(): boolean {
   return process.env.WECHAT_PAY_SANDBOX === "true";
 }

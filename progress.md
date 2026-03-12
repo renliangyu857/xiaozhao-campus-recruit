@@ -187,3 +187,10 @@ WECHAT_PAY_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----
 - 已同步更新 `docs/微信登录配置说明.md`，移除真实配置示例并改为占位符。
 - 定向校验：`npx eslint` 已通过（仅 Markdown 文件被 ESLint 忽略）；`npx tsc --noEmit` 仍被既有 E2E 用例 `test.request` 类型错误阻塞，未见本次改动新增报错。
 - 已修复 4 个 API E2E 用例的 Playwright `request` 类型声明（改为 `APIRequestContext`），`npx tsc --noEmit` 与定向 `npx eslint` 现已通过。
+
+### 2026-03-12
+- 使用 `planning-with-files` 评估微信支付后续演进方向。
+- 结论：支付链路需要补齐结构化日志、告警和用户侧订单记录中心。
+- 已将后续实施拆为两类：服务端可观测性（日志/告警/补单）与用户端可回溯性（订单列表/详情/刷新状态）。
+- 建议执行顺序：先日志与告警，再订单记录页面，最后做退款和消息通知。
+- 已开始落地第一版支付可观测性与订单中心：新增支付补账日志、订单列表 API、订单列表页与详情页，并把入口接入导航。
