@@ -1,7 +1,9 @@
-/**
+﻿/**
  * 微信相关配置和工具函数
  * 配置预留位置，稍后填入真实值
  */
+
+import { logger } from "@/lib/logger";
 
 // 微信公众号配置（请填入真实值）
 export const WECHAT_CONFIG = {
@@ -201,12 +203,24 @@ export function parseState(stateStr: string): AuthState | null {
 export async function getWechatAccessToken(): Promise<string> {
   const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${WECHAT_CONFIG.APP_ID}&secret=${WECHAT_CONFIG.APP_SECRET}`;
 
+  logger.info("wechat_access_token_request_started", {
+    appIdConfigured: Boolean(WECHAT_CONFIG.APP_ID),
+  });
+
   const res = await fetch(url);
   const data = await res.json();
 
   if (data.errcode) {
+    logger.error("wechat_access_token_request_failed", {
+      errcode: data.errcode,
+      errmsg: data.errmsg,
+    });
     throw new Error(`获取 access_token 失败: ${data.errmsg}`);
   }
+
+  logger.info("wechat_access_token_request_succeeded", {
+    expiresIn: data.expires_in,
+  });
 
   return data.access_token;
 }
@@ -257,6 +271,10 @@ export interface MpQrCodeResponse {
 const WECHAT_PROXY_URL = process.env.WECHAT_PROXY_URL || "";
 const WECHAT_PROXY_TOKEN = process.env.WECHAT_PROXY_TOKEN || "";
 
+function getScenePreview(sceneStr: string): string {
+  return sceneStr.length <= 12 ? sceneStr : `${sceneStr.slice(0, 6)}...${sceneStr.slice(-4)}`;
+}
+
 // 检查代理健康状态（带缓存，避免频繁检查）
 let proxyHealthCheck: { healthy: boolean; timestamp: number } | null = null;
 const PROXY_HEALTH_CACHE_MS = 30000; // 30秒内不再重复检查
@@ -281,9 +299,18 @@ async function isProxyHealthy(): Promise<boolean> {
 
     const healthy = res.ok;
     proxyHealthCheck = { healthy, timestamp: Date.now() };
+    logger.info("wechat_proxy_health_checked", {
+      proxyUrl: WECHAT_PROXY_URL,
+      healthy,
+      status: res.status,
+    });
     return healthy;
-  } catch {
+  } catch (error) {
     proxyHealthCheck = { healthy: false, timestamp: Date.now() };
+    logger.warn("wechat_proxy_health_failed", {
+      proxyUrl: WECHAT_PROXY_URL,
+      error: String(error),
+    });
     return false;
   }
 }
@@ -299,15 +326,46 @@ export async function generateMpQrCode(
   sceneStr: string,
   expireSeconds = 600
 ): Promise<MpQrCodeResponse> {
-  // 如果配置了代理服务器且代理健康，使用代理
-  const useProxy = WECHAT_PROXY_URL && WECHAT_PROXY_TOKEN && await isProxyHealthy();
+  const hasProxyUrl = Boolean(WECHAT_PROXY_URL);
+  const hasProxyToken = Boolean(WECHAT_PROXY_TOKEN);
+  const hasFullProxyConfig = hasProxyUrl && hasProxyToken;
 
-  if (useProxy) {
+  logger.info("wechat_qrcode_generation_started", {
+    scenePreview: getScenePreview(sceneStr),
+    expireSeconds,
+    hasProxyUrl,
+    hasProxyToken,
+    proxyUrl: hasProxyUrl ? WECHAT_PROXY_URL : undefined,
+  });
+
+  if (hasProxyUrl !== hasProxyToken) {
+    logger.error("wechat_qrcode_proxy_config_invalid", {
+      hasProxyUrl,
+      hasProxyToken,
+      proxyUrl: hasProxyUrl ? WECHAT_PROXY_URL : undefined,
+    });
+    throw new Error("二维码生成失败: WECHAT_PROXY_URL 和 WECHAT_PROXY_TOKEN 需要同时配置");
+  }
+
+  if (hasFullProxyConfig) {
+    const proxyHealthy = await isProxyHealthy();
+    if (!proxyHealthy) {
+      logger.error("wechat_qrcode_proxy_unhealthy", {
+        proxyUrl: WECHAT_PROXY_URL,
+        scenePreview: getScenePreview(sceneStr),
+      });
+      throw new Error(`二维码生成失败: 微信代理服务不可用 (${WECHAT_PROXY_URL}/health)`);
+    }
+
     console.log("[WechatQR] Using proxy:", WECHAT_PROXY_URL);
+    logger.info("wechat_qrcode_proxy_selected", {
+      proxyUrl: WECHAT_PROXY_URL,
+      scenePreview: getScenePreview(sceneStr),
+      expireSeconds,
+    });
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000); // 10秒超时
-
+      const timeout = setTimeout(() => controller.abort(), 10000);
       const res = await fetch(`${WECHAT_PROXY_URL}/wechat/qrcode`, {
         method: "POST",
         headers: {
@@ -325,8 +383,20 @@ export async function generateMpQrCode(
       const data = await res.json();
 
       if (!res.ok || data.error) {
-        throw new Error(`代理生成二维码失败: ${data.errmsg || data.error || res.statusText}`);
+        logger.error("wechat_qrcode_proxy_response_invalid", {
+          proxyUrl: WECHAT_PROXY_URL,
+          scenePreview: getScenePreview(sceneStr),
+          status: res.status,
+          error: data.errmsg || data.error || res.statusText,
+        });
+        throw new Error(data.errmsg || data.error || res.statusText);
       }
+
+      logger.info("wechat_qrcode_proxy_succeeded", {
+        proxyUrl: WECHAT_PROXY_URL,
+        scenePreview: getScenePreview(sceneStr),
+        expireSeconds: data.expire_seconds,
+      });
 
       return {
         ticket: data.ticket,
@@ -335,13 +405,20 @@ export async function generateMpQrCode(
       };
     } catch (error) {
       console.error("[WechatQR] Proxy fetch failed:", error);
-      // 代理失败，记录但不立即抛出，尝试降级到直接连接
-      console.log("[WechatQR] Proxy failed, trying direct WeChat API...");
+      logger.error("wechat_qrcode_proxy_failed", {
+        proxyUrl: WECHAT_PROXY_URL,
+        scenePreview: getScenePreview(sceneStr),
+        error: String(error),
+      });
+      throw new Error(`二维码生成失败: 代理服务请求失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  // 未配置代理或代理失败，尝试直接调用微信 API（需要有 IP 白名单）
   console.log("[WechatQR] Using direct WeChat API");
+  logger.warn("wechat_qrcode_direct_api_selected", {
+    scenePreview: getScenePreview(sceneStr),
+    expireSeconds,
+  });
   try {
     const accessToken = await getWechatAccessToken();
 
@@ -366,8 +443,18 @@ export async function generateMpQrCode(
     const data = await res.json();
 
     if (data.errcode) {
+      logger.error("wechat_qrcode_direct_api_error", {
+        scenePreview: getScenePreview(sceneStr),
+        errcode: data.errcode,
+        errmsg: data.errmsg,
+      });
       throw new Error(`生成带参数二维码失败: ${data.errmsg} (code: ${data.errcode})`);
     }
+
+    logger.info("wechat_qrcode_direct_api_succeeded", {
+      scenePreview: getScenePreview(sceneStr),
+      expireSeconds: data.expire_seconds,
+    });
 
     return {
       ticket: data.ticket,
@@ -376,14 +463,13 @@ export async function generateMpQrCode(
     };
   } catch (error) {
     console.error("[WechatQR] Direct API failed:", error);
+    logger.error("wechat_qrcode_direct_api_failed", {
+      scenePreview: getScenePreview(sceneStr),
+      error: String(error),
+    });
     throw new Error(`二维码生成失败: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
-
-/**
- * 获取带参数二维码图片 URL
- * 用户扫码后会触发关注事件，可以获取 openid
- */
 export function getMpQrCodeImageUrl(ticket: string): string {
   return `https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=${encodeURIComponent(ticket)}`;
 }

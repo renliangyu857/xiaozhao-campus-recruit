@@ -194,3 +194,11 @@ WECHAT_PAY_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----
 - 已将后续实施拆为两类：服务端可观测性（日志/告警/补单）与用户端可回溯性（订单列表/详情/刷新状态）。
 - 建议执行顺序：先日志与告警，再订单记录页面，最后做退款和消息通知。
 - 已开始落地第一版支付可观测性与订单中心：新增支付补账日志、订单列表 API、订单列表页与详情页，并把入口接入导航。
+- 已排查微信登录二维码报错：确认代理逻辑仍在，问题出在代理失败后的自动降级直连。
+- 已修复 `lib/wechat.ts`，生产配置代理时若代理不可用将直接报“代理服务不可用/请求失败”，避免落到微信 IP 白名单错误。
+- 定向校验：`eslint lib/wechat.ts app/api/auth/qrcode/route.ts app/api/wechat/mp-event/route.ts` 通过。
+
+- ??????????????????? `qrcode_login_requested` ? `wechat_access_token_request_failed/succeeded`?
+- ??????? `0.1` ????????????????????
+
+- ???????`.\node_modules\.bin\eslint.cmd lib/wechat.ts app/api/auth/qrcode/route.ts app/api/wechat/mp-event/route.ts lib/payment-config.ts app/api/vip/plans/route.ts app/api/payment/create/route.ts` ???

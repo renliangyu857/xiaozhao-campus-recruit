@@ -53,11 +53,11 @@ export function getPaymentStatusMeta(status: string) {
 }
 
 export function getBizStatusLabel(status: string) {
-  return BIZ_STATUS_META[status] ?? status || "未知";
+  return (BIZ_STATUS_META[status] ?? status) || "未知";
 }
 
 export function getProductTypeLabel(type: string) {
-  return PRODUCT_TYPE_META[type] ?? type || "订单";
+  return (PRODUCT_TYPE_META[type] ?? type) || "订单";
 }
 
 export function PaymentStatusBadge({ status }: { status: string }) {

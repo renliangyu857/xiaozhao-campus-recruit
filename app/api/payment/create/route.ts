@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
           productName: existingOrder.productName,
           amount: existingOrder.amount,
           originalAmount: existingOrder.originalAmount,
-          isFirstMonth: productType === "vip" && productId === "1_month" && existingOrder.amount === 580,
+          isFirstMonth: productType === "vip" && productId === "1_month" && existingOrder.amount === 10,
           qrcodeUrl: existingOrder.wxCodeUrl,
           qrcodeImageUrl: `/api/payment/qrcode/${existingOrder.orderNo}`,
           expiryTime: getPaymentOrderExpiryTime(existingOrder.createdAt),

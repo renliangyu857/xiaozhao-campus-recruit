@@ -331,7 +331,7 @@ export function decryptNotification(
  * 鐢熸垚浜岀淮鐮佸浘鐗囷紙浣跨敤Google Charts API鎴栨湰鍦扮敓鎴愶級
  * 杩欓噷浣跨敤 qrcode 搴? */
 export async function generateQRCode(codeUrl: string): Promise<Buffer> {
-  // 鍔ㄦ€佸鍏?qrcode 搴?  const QRCode = await import("qrcode");
+  const QRCode = await import("qrcode");
 
   return QRCode.toBuffer(codeUrl, {
     type: "png",

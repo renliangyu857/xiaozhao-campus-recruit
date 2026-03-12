@@ -19,9 +19,14 @@ import { logger } from "@/lib/logger";
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(_request: NextRequest) {
+  logger.info("qrcode_login_requested", {});
+
   // 验证配置
   const configCheck = validateWechatConfig();
   if (!configCheck.valid) {
+    logger.error("qrcode_login_config_invalid", {
+      missing: configCheck.missing,
+    });
     return NextResponse.json(
       {
         message: "微信登录配置未完成",
@@ -34,6 +39,9 @@ export async function GET(_request: NextRequest) {
   try {
     // 创建登录票据
     const ticketData = await createLoginTicket();
+    logger.info("qrcode_login_ticket_created", {
+      ticket: ticketData.ticket,
+    });
 
     // 生成带参数二维码（使用 ticket 作为场景值）
     // 用户扫码关注后，微信会推送事件到 /api/wechat/mp-event
@@ -45,6 +53,7 @@ export async function GET(_request: NextRequest) {
     logger.info("qrcode_login_created", {
       ticket: ticketData.ticket,
       mpTicket: mpQrCode.ticket,
+      expiresIn: mpQrCode.expire_seconds,
     });
 
     return NextResponse.json({
@@ -55,7 +64,9 @@ export async function GET(_request: NextRequest) {
       expiresIn: mpQrCode.expire_seconds,
     });
   } catch (error) {
-    logger.error("qrcode_login_failed", { error: String(error) });
+    logger.error("qrcode_login_failed", {
+      error: String(error),
+    });
     return NextResponse.json(
       { message: "生成登录二维码失败", error: String(error) },
       { status: 500 }

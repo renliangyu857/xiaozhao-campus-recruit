@@ -19,15 +19,30 @@ async function fetchWechatUserInfo(openid: string): Promise<{ nickname?: string;
   try {
     // 如果配置了代理，使用代理获取用户信息
     if (WECHAT_PROXY_URL && WECHAT_PROXY_TOKEN) {
+      logger.info("wechat_mp_userinfo_proxy_selected", {
+        openid,
+        proxyUrl: WECHAT_PROXY_URL,
+      });
       const userRes = await fetch(`${WECHAT_PROXY_URL}/wechat/userinfo?openid=${openid}`, {
         method: "GET",
         headers: { "Authorization": `Bearer ${WECHAT_PROXY_TOKEN}` },
       });
       const userData = await userRes.json();
       if (userData.error || !userRes.ok) {
+        logger.error("wechat_mp_userinfo_proxy_failed", {
+          openid,
+          proxyUrl: WECHAT_PROXY_URL,
+          status: userRes.status,
+          error: userData.errmsg || userData.error || userRes.statusText,
+        });
         console.error("[WechatMP] Failed to get user info from proxy:", userData);
         return null;
       }
+      logger.info("wechat_mp_userinfo_proxy_succeeded", {
+        openid,
+        proxyUrl: WECHAT_PROXY_URL,
+        hasNickname: Boolean(userData.nickname),
+      });
       return {
         nickname: userData.nickname,
         headimgurl: userData.headimgurl,
@@ -92,7 +107,7 @@ export async function GET(request: NextRequest) {
   const nonce = searchParams.get("nonce") || "";
   const echostr = searchParams.get("echostr") || "";
 
-  console.log("[WechatMP] Verification request:", {
+  logger.info("wechat_mp_verification_requested", {
     signature,
     timestamp,
     nonce,
@@ -102,11 +117,13 @@ export async function GET(request: NextRequest) {
 
   // 验证签名
   if (!verifyWechatSignature(signature, timestamp, nonce)) {
+    logger.warn("wechat_mp_verification_failed", { timestamp, nonce });
     console.error("[WechatMP] Signature verification failed");
     return new NextResponse("Forbidden", { status: 403 });
   }
 
   // 签名验证通过，返回 echostr
+  logger.info("wechat_mp_verification_succeeded", { timestamp, nonce });
   console.log("[WechatMP] Signature verified, returning echostr");
   return new NextResponse(echostr);
 }
@@ -130,6 +147,11 @@ export async function POST(request: NextRequest) {
     }
 
     const xml = await request.text();
+    logger.info("wechat_mp_event_received", {
+      timestamp,
+      nonce,
+      xmlLength: xml.length,
+    });
     console.log("[WechatMP] Received event:", xml);
 
     const msg = parseWechatXml(xml);
@@ -138,6 +160,11 @@ export async function POST(request: NextRequest) {
     }
 
     const { FromUserName: openid, Event, EventKey } = msg;
+    logger.info("wechat_mp_event_parsed", {
+      openid,
+      event: Event,
+      eventKey: EventKey,
+    });
 
     // 处理关注事件（包括扫码关注）
     console.log("[WechatMP] Processing event:", { Event, EventKey, openid });
@@ -151,6 +178,7 @@ export async function POST(request: NextRequest) {
     // 返回空响应（或欢迎消息）
     return new NextResponse("success");
   } catch (error) {
+    logger.error("wechat_mp_event_failed", { error: String(error) });
     console.error("[WechatMP] Error handling event:", error);
     return new NextResponse("success");
   }
