@@ -213,5 +213,6 @@ export function formatAmount(amount: number): string {
  * 计算倒计时秒数
  */
 export function calculateCountdown(expiryTime: number): number {
-  return Math.max(0, Math.ceil((expiryTime - Date.now()) / 1000));
+  const normalizedExpiryTime = expiryTime < 1_000_000_000_000 ? expiryTime * 1000 : expiryTime;
+  return Math.max(0, Math.ceil((normalizedExpiryTime - Date.now()) / 1000));
 }

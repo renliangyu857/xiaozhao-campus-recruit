@@ -75,7 +75,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                 }`}
               >
-                <List size={16} /> 鑱屼綅鏌ヨ
+                <List size={16} /> ????
               </Link>
               <Link
                 href="/progress"
@@ -85,7 +85,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                 }`}
               >
-                <BarChart3 size={16} /> 杩涘害缁熻
+                <BarChart3 size={16} /> ????
               </Link>
               <Link
                 href="/exam"
@@ -95,7 +95,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                 }`}
               >
-                <FileText size={16} /> 绗旈潰璇曡祫鏂?
+                <FileText size={16} /> ????
               </Link>
               {user?.isVip && (
                 <Link
@@ -106,7 +106,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                       : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                   }`}
                 >
-                  <KeyRound size={16} /> 鍐呮帹鐮?
+                  <KeyRound size={16} /> ????
                 </Link>
               )}
               {user && (
@@ -118,7 +118,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                       : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                   }`}
                 >
-                  <Gift size={16} /> 閭€璇锋湁绀?
+                  <Gift size={16} /> ????
                 </Link>
               )}
               {user && (
@@ -141,7 +141,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                 }`}
               >
-                <Crown size={16} className={user?.isVip ? "text-amber-500 fill-amber-500" : ""} /> 浼氬憳涓績
+                <Crown size={16} className={user?.isVip ? "text-amber-500 fill-amber-500" : ""} /> ????
               </Link>
             </div>
           </div>
@@ -205,7 +205,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                         className="w-full px-4 py-2.5 text-left text-sm text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5 transition-colors flex items-center gap-2"
                       >
                         <LogOut size={16} />
-                        閫€鍑虹櫥褰?
+                        ????
                       </button>
                     </div>
                   )}
@@ -216,7 +216,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                 onClick={onLogin}
                 className="btn btn-primary shadow-lg shadow-orange-200"
               >
-                寰俊鐧诲綍
+                ????
               </button>
             )}
           </div>
@@ -230,7 +230,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
           className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
         >
           <List size={22} strokeWidth={pathname === "/" ? 2.5 : 2} />
-          <span className="text-[10px] font-semibold mt-1">鑱屼綅</span>
+          <span className="text-[10px] font-semibold mt-1">??</span>
         </Link>
         <Link
           href="/progress"

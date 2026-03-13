@@ -48,7 +48,16 @@ export function PaymentQRCodeModal({
     setQrCodeUrl(`${getQRCodeImageUrl(orderNo)}?t=${Date.now()}`);
   }, [orderNo]);
 
-  // 倒计时
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setStatus("pending");
+    setError("");
+    setCountdown(calculateCountdown(expiryTime));
+    setQrCodeUrl(getQRCodeImageUrl(orderNo));
+  }, [isOpen, orderNo, expiryTime]);
+
+  // ???
   useEffect(() => {
     if (!isOpen) return;
 
@@ -65,7 +74,7 @@ export function PaymentQRCodeModal({
     return () => clearInterval(timer);
   }, [isOpen, expiryTime, status, onPaymentExpired]);
 
-  // 轮询支付状态
+  // ??????
   useEffect(() => {
     if (!isOpen || status !== "pending") return;
 
