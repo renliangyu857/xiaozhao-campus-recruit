@@ -24,6 +24,36 @@ interface NavBarProps {
   onLogout?: () => Promise<void>;
 }
 
+const NAVBAR_LABELS = {
+  logo: "校招喵",
+  desktop: {
+    jobs: "职位查询",
+    progress: "进度统计",
+    materials: "笔面试资料",
+    referralCodes: "内推码",
+    invite: "邀请有礼",
+    orders: "我的订单",
+    vip: "会员中心",
+  },
+  mobile: {
+    jobs: "职位",
+    progress: "进度",
+    materials: "资料",
+    referralCodes: "内推",
+    invite: "邀请",
+    orders: "订单",
+    vip: "会员",
+  },
+  user: {
+    vip: "VIP 会员",
+    default: "普通用户",
+  },
+  actions: {
+    login: "微信登录",
+    logout: "退出登录",
+  },
+} as const;
+
 export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
   const pathname = usePathname();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -31,7 +61,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
 
   const isActive = (path: string) => pathname === path;
 
-  // 鐐瑰嚮澶栭儴鍏抽棴涓嬫媺鑿滃崟
+  // 点击外部关闭下拉菜单
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
@@ -62,7 +92,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                 </div>
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#0D7377] rounded-full border-2 border-white animate-pulse" />
               </div>
-              <span className="text-xl font-bold tracking-tight text-gradient">校招喵</span>
+              <span className="text-xl font-bold tracking-tight text-gradient">{NAVBAR_LABELS.logo}</span>
             </Link>
 
             {/* Desktop Navigation */}
@@ -75,7 +105,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                 }`}
               >
-                <List size={16} /> ????
+                <List size={16} /> {NAVBAR_LABELS.desktop.jobs}
               </Link>
               <Link
                 href="/progress"
@@ -85,7 +115,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                 }`}
               >
-                <BarChart3 size={16} /> ????
+                <BarChart3 size={16} /> {NAVBAR_LABELS.desktop.progress}
               </Link>
               <Link
                 href="/exam"
@@ -95,7 +125,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                 }`}
               >
-                <FileText size={16} /> ????
+                <FileText size={16} /> {NAVBAR_LABELS.desktop.materials}
               </Link>
               {user?.isVip && (
                 <Link
@@ -106,7 +136,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                       : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                   }`}
                 >
-                  <KeyRound size={16} /> ????
+                  <KeyRound size={16} /> {NAVBAR_LABELS.desktop.referralCodes}
                 </Link>
               )}
               {user && (
@@ -118,7 +148,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                       : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                   }`}
                 >
-                  <Gift size={16} /> ????
+                  <Gift size={16} /> {NAVBAR_LABELS.desktop.invite}
                 </Link>
               )}
               {user && (
@@ -130,7 +160,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                       : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                   }`}
                 >
-                  <ReceiptText size={16} /> 我的订单
+                  <ReceiptText size={16} /> {NAVBAR_LABELS.desktop.orders}
                 </Link>
               )}
               <Link
@@ -141,7 +171,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     : "text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5"
                 }`}
               >
-                <Crown size={16} className={user?.isVip ? "text-amber-500 fill-amber-500" : ""} /> ????
+                <Crown size={16} className={user?.isVip ? "text-amber-500 fill-amber-500" : ""} /> {NAVBAR_LABELS.desktop.vip}
               </Link>
             </div>
           </div>
@@ -155,7 +185,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     <Crown size={12} className="fill-amber-500 text-amber-500" /> VIP
                   </span>
                 )}
-                {/* 鐢ㄦ埛涓嬫媺鑿滃崟 */}
+                {/* 用户下拉菜单 */}
                 <div className="relative" ref={userMenuRef}>
                   <button
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
@@ -183,13 +213,13 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                     />
                   </button>
 
-                  {/* 涓嬫媺鑿滃崟 */}
+                  {/* 下拉菜单 */}
                   {isUserMenuOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-[#E8E8E8] py-2 animate-fade-in-down">
                       <div className="px-4 py-3 border-b border-[#E8E8E8]/60">
                         <p className="text-sm font-semibold text-[#2C3E50]">{user.nickname}</p>
                         <p className="text-xs text-[#95A5A6] mt-0.5">
-                          {user.isVip ? "VIP 会员" : "普通用户"}
+                          {user.isVip ? NAVBAR_LABELS.user.vip : NAVBAR_LABELS.user.default}
                         </p>
                       </div>
                       <Link
@@ -198,14 +228,14 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                         className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-[#5D6D7E] transition-colors hover:bg-[#FF6B4A]/5 hover:text-[#FF6B4A]"
                       >
                         <ReceiptText size={16} />
-                        我的订单
+                        {NAVBAR_LABELS.desktop.orders}
                       </Link>
                       <button
                         onClick={handleLogout}
                         className="w-full px-4 py-2.5 text-left text-sm text-[#5D6D7E] hover:text-[#FF6B4A] hover:bg-[#FF6B4A]/5 transition-colors flex items-center gap-2"
                       >
                         <LogOut size={16} />
-                        ????
+                        {NAVBAR_LABELS.actions.logout}
                       </button>
                     </div>
                   )}
@@ -216,7 +246,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
                 onClick={onLogin}
                 className="btn btn-primary shadow-lg shadow-orange-200"
               >
-                ????
+                {NAVBAR_LABELS.actions.login}
               </button>
             )}
           </div>
@@ -230,21 +260,21 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
           className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
         >
           <List size={22} strokeWidth={pathname === "/" ? 2.5 : 2} />
-          <span className="text-[10px] font-semibold mt-1">??</span>
+          <span className="text-[10px] font-semibold mt-1">{NAVBAR_LABELS.mobile.jobs}</span>
         </Link>
         <Link
           href="/progress"
           className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/progress" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
         >
           <BarChart3 size={22} strokeWidth={pathname === "/progress" ? 2.5 : 2} />
-          <span className="text-[10px] font-semibold mt-1">杩涘害</span>
+          <span className="text-[10px] font-semibold mt-1">{NAVBAR_LABELS.mobile.progress}</span>
         </Link>
         <Link
           href="/exam"
           className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/exam" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
         >
           <FileText size={22} strokeWidth={pathname === "/exam" ? 2.5 : 2} />
-          <span className="text-[10px] font-semibold mt-1">璧勬枡</span>
+          <span className="text-[10px] font-semibold mt-1">{NAVBAR_LABELS.mobile.materials}</span>
         </Link>
         {user?.isVip && (
           <Link
@@ -252,7 +282,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
             className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/referral-codes" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
           >
             <KeyRound size={22} strokeWidth={pathname === "/referral-codes" ? 2.5 : 2} />
-            <span className="text-[10px] font-semibold mt-1">鍐呮帹</span>
+            <span className="text-[10px] font-semibold mt-1">{NAVBAR_LABELS.mobile.referralCodes}</span>
           </Link>
         )}
         {user && (
@@ -261,7 +291,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
             className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/invite" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
           >
             <Gift size={22} strokeWidth={pathname === "/invite" ? 2.5 : 2} />
-            <span className="text-[10px] font-semibold mt-1">邀请</span>
+            <span className="text-[10px] font-semibold mt-1">{NAVBAR_LABELS.mobile.invite}</span>
           </Link>
         )}
         {user && (
@@ -270,7 +300,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
             className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/orders" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
           >
             <ReceiptText size={22} strokeWidth={pathname === "/orders" ? 2.5 : 2} />
-            <span className="text-[10px] font-semibold mt-1">订单</span>
+            <span className="text-[10px] font-semibold mt-1">{NAVBAR_LABELS.mobile.orders}</span>
           </Link>
         )}
         <Link
@@ -278,7 +308,7 @@ export function NavBar({ user, onLogin, onLogout }: NavBarProps) {
           className={`flex flex-1 flex-col items-center p-2 rounded-xl transition-all ${pathname === "/vip" ? "text-[#FF6B4A]" : "text-[#95A5A6]"}`}
         >
           <Crown size={22} strokeWidth={pathname === "/vip" ? 2.5 : 2} className={user?.isVip ? "text-amber-500 fill-amber-500" : ""} />
-          <span className="text-[10px] font-semibold mt-1">浼氬憳</span>
+          <span className="text-[10px] font-semibold mt-1">{NAVBAR_LABELS.mobile.vip}</span>
         </Link>
       </div>
     </nav>
