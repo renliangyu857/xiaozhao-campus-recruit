@@ -1,0 +1,39 @@
+
+小红书定时任务使用说明
+========================
+
+重要提示：批处理文件有编码问题，请使用 PowerShell 版本！
+
+推荐使用方式：
+
+1. 立即测试生成：
+   右键点击 "立即生成.ps1"
+   选择 "使用 PowerShell 运行"
+
+2. 启动定时任务：
+   右键点击 "启动定时任务.ps1"
+   选择 "使用 PowerShell 运行"
+
+3. 如果无法运行 PowerShell 脚本，请先在 PowerShell 中执行：
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+4. 或者直接使用命令行：
+   npm run xhs:generate    # 立即生成
+   npm run xhs:schedule    # 启动定时任务
+
+生成的内容保存位置：
+daily_output/xhs-images/{类别}-{日期}/
+
+每个目录包含：
+- 4张 Notion 风格图片
+- 笔记文字内容 (note-text.txt)
+- 源文件和分析文件
+
+定时任务设置：
+- 时间：每天早上 10:00
+- 时区：中国时区
+- 注意：需要保持 PowerShell 窗口打开
+
+关于小红书发布：
+脚本不包含自动发布功能。生成内容后，请手动复制文案和上传图片到小红书。
+

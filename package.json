@@ -13,7 +13,9 @@
     "e2e:api": "playwright test --config=playwright.api.config.ts",
     "db:push": "dotenv -e .env.local -- prisma db push",
     "db:migrate": "dotenv -e .env.local -- prisma migrate deploy",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "xhs:generate": "dotenv -e .env.local -- node scripts/daily-xhs-generator.js",
+    "xhs:schedule": "dotenv -e .env.local -- node scripts/scheduled-runner.js"
   },
   "engines": {
     "node": ">=22.0.0"
@@ -27,7 +29,9 @@
     "ioredis": "^5.9.3",
     "lucide-react": "^0.575.0",
     "next": "^15.2.0",
+    "node-cron": "^3.0.3",
     "pdf-lib": "^1.17.1",
+    "pg": "^8.20.0",
     "prisma": "^6.19.2",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
@@ -44,10 +48,12 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.3.1",
     "dotenv-cli": "^8.0.0",
     "eslint": "^9",
     "eslint-config-next": "15.2.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "xlsx": "^0.18.5"
   }
 }
