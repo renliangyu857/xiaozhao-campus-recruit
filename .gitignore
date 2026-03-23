@@ -62,3 +62,30 @@ next-env.d.ts
 
 # Coverage
 /coverage
+
+# Temp / Debug
+%APPDATA%/
+.baoyu-skills/
+Claude-to-IM-skill/
+agent-reach/
+baoyu-skills/
+check_data.js
+create_rewrite_prompts.py
+daily_output/
+generate_rewrite_from_search.py
+prisma/add_batch_column.sql
+prisma/run_sql_migration.js
+prisma/run_sql_with_prisma.js
+prisma/test_job_query.js
+run_daily_task.js
+run_daily_task.ps1
+run_simple_daily.ps1
+simple_job_script.js
+simple_prompt_saver.py
+simple_rewrite_generator.py
+verify_database.js
+xhs-images/
+*.pyc
+__pycache__/
+*.ps1
+*.bat
