@@ -5,6 +5,45 @@ import { NextRequest, NextResponse } from 'next/server';
  * 用于接收 Sentry Webhook 事件并转发到飞书群机器人
  */
 
+// TypeScript 类型定义
+interface SentryUser {
+  id?: string;
+  email?: string;
+  username?: string;
+  ip_address?: string;
+}
+
+interface SentryProject {
+  name: string;
+}
+
+interface SentryEvent {
+  event_id?: string;
+  level: string;
+  title: string;
+  project: SentryProject;
+  tags?: Record<string, string>;
+  culprit?: string;
+  user?: SentryUser;
+  timestamp: number;
+  url?: string;
+  event_type?: string;
+}
+
+interface FeishuCard {
+  config: {
+    wide_screen_mode: boolean;
+  };
+  elements: Record<string, unknown>[];
+  header: {
+    title: {
+      tag: string;
+      content: string;
+    };
+    template: string;
+  };
+}
+
 // 飞书 Webhook URL（需要在 .env 中配置）
 const FEISHU_WEBHOOK_URL = process.env.FEISHU_WEBHOOK_URL;
 
@@ -21,8 +60,8 @@ const LEVEL_COLORS: Record<string, string> = {
 };
 
 // 将 Sentry 事件转换为飞书卡片
-function convertToFeishuCard(event: any) {
-  const { event_id, level, title, project, tags, culprit, user, timestamp } = event;
+function convertToFeishuCard(event: SentryEvent): FeishuCard {
+  const { level, title, project, tags, culprit, user, timestamp } = event;
 
   // 基本信息
   const levelColor = LEVEL_COLORS[level] || 'blue';
@@ -147,7 +186,7 @@ function convertToFeishuCard(event: any) {
 }
 
 // 发送到飞书
-async function sendToFeishu(card: any) {
+async function sendToFeishu(card: FeishuCard) {
   if (!FEISHU_WEBHOOK_URL) {
     console.warn('未配置飞书 Webhook URL');
     return false;
@@ -293,7 +332,7 @@ export async function GET(request: NextRequest) {
     },
   };
 
-  const success = await sendToFeishu(testCard);
+  const success = await sendToFeishu(testCard as FeishuCard);
 
   if (success) {
     return NextResponse.json({
