@@ -66,3 +66,11 @@
 - **原因**：添加了 NextRequest 类型的 request 参数但没有使用
 - **修复**：移除了未使用的 request 参数
 - **结果**：现在 eslint 检查通过
+
+## 构建失败问题修复
+
+- **问题**：npm run build 失败，提示找不到 `@antv/infographic` 和 `claude-to-im/src/lib/bridge/host.js` 模块
+- **位置**：`baoyu-skills/packages/baoyu-md/src/extensions/infographic.ts` 和 `Claude-to-IM-skill/src/codex-provider.ts`
+- **原因**：`baoyu-skills` 和 `Claude-to-IM-skill` 目录虽然在 `.gitignore` 中，但 `tsconfig.json` 的 `include` 配置会尝试编译所有 TypeScript 文件
+- **修复**：在 `tsconfig.json` 的 `exclude` 数组中添加了 `baoyu-skills` 和 `Claude-to-IM-skill`
+- **结果**：现在 npm run build 可以成功完成

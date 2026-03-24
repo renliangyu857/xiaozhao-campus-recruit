@@ -25,3 +25,8 @@
   - 发现 app/api/vip/plans/route.ts 中 request 参数定义但未使用
   - 移除了未使用的 request 参数
   - 现在 eslint 检查通过
+- 2026-03-24：修复构建失败问题：
+  - 发现 npm run build 失败，提示找不到 @antv/infographic 模块
+  - 问题是 baoyu-skills 和 Claude-to-IM-skill 目录被 TypeScript 编译器尝试编译
+  - 在 tsconfig.json 的 exclude 数组中添加了这两个目录
+  - 现在 npm run build 成功完成

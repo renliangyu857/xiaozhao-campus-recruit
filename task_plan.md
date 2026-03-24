@@ -20,6 +20,7 @@
 | 7. 添加直接测试飞书告警的功能 | complete | 在 app/sentry-test/page.tsx 中添加了「测试飞书告警」按钮 |
 | 8. 提交并推送代码 | complete | 将最终修改提交到仓库 |
 | 9. 修复 eslint 错误 | complete | 移除了 app/api/vip/plans/route.ts 中未使用的 request 参数 |
+| 10. 修复构建失败问题 | complete | 修复 npm run build 失败问题，在 tsconfig.json 中排除 baoyu-skills 和 Claude-to-IM-skill 目录 |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
@@ -27,3 +28,4 @@
 | 理解偏差 | 1 | 初次误解了用户需求，以为要完全移除 Sentry |
 | eventId 未使用 | 2 | 从 git 历史恢复了完整的 lib/monitoring.ts 文件，修复了 eslint 错误 |
 | VIP 价格显示 0.1 元 | 3 | 发现 app/api/vip/plans/route.ts 中价格是硬编码的，修改为调用 getProductPrice 函数 |
+| 构建失败问题 | 4 | npm run build 失败，提示找不到 @antv/infographic 和 claude-to-im 模块，在 tsconfig.json 中排除 baoyu-skills 和 Claude-to-IM-skill 目录 |
