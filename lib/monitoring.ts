@@ -1,59 +1,64 @@
-import * as Sentry from '@sentry/nextjs';
-
 /**
  * 监控工具集
  * 用于错误追踪、性能监控和用户行为分析
+ *
+ * 注意：当前已移除官方 Sentry 集成
+ * 如需使用其他监控服务，请在此配置
  */
+
+// 类型定义（保持与原 Sentry 接口兼容）
+export type SeverityLevel = 'fatal' | 'error' | 'warning' | 'log' | 'info' | 'debug';
+
 export const monitoring = {
   /**
    * 捕获并上报异常
    */
   captureException: (error: Error, context?: Record<string, unknown>) => {
-    Sentry.captureException(error, {
-      extra: context,
-    });
+    // 当前仅记录到控制台
+    console.error('[monitoring] Captured exception:', error);
+    if (context) {
+      console.error('[monitoring] Context:', context);
+    }
+
+    // 可以在此添加其他监控服务集成
+    // 例如：自建的飞书告警、其他 APM 服务等
   },
 
   /**
    * 捕获并上报消息
    */
-  captureMessage: (message: string, level: Sentry.SeverityLevel = 'info') => {
-    Sentry.captureMessage(message, level);
+  captureMessage: (message: string, level: SeverityLevel = 'info') => {
+    console.log(`[monitoring][${level}] Message: ${message}`);
+
+    // 可以在此添加其他监控服务集成
   },
 
   /**
    * 设置用户信息（用于关联错误和用户）
    */
   setUser: (user: { id: string; email?: string; username?: string }) => {
-    Sentry.setUser(user);
+    console.log(`[monitoring] Set user: ${user.id} ${user.email || ''}`);
   },
 
   /**
    * 清除用户信息（用户登出时调用）
    */
   clearUser: () => {
-    Sentry.setUser(null);
+    console.log('[monitoring] Clear user');
   },
 
   /**
    * 添加面包屑（记录用户操作路径）
    */
   addBreadcrumb: (message: string, category?: string, data?: Record<string, unknown>) => {
-    Sentry.addBreadcrumb({
-      message,
-      category,
-      data,
-      level: 'info',
-    });
+    console.log(`[monitoring][breadcrumb] ${category || 'default'}: ${message}`, data || '');
   },
 
   /**
-   * 性能追踪 - 开始事务 (已废弃，新版 Sentry 使用不同的 API)
+   * 性能追踪 - 开始事务 (已废弃，保持兼容性)
    */
   startTransaction: (name: string, op: string) => {
-    // Sentry.startTransaction 在新版本中已被移除
-    // 返回一个 mock 对象以保持兼容性
-    console.warn('startTransaction is deprecated in new Sentry versions');
+    console.warn('[monitoring] startTransaction is deprecated');
     return {
       name,
       op,
@@ -67,16 +72,7 @@ export const monitoring = {
    * 用于追踪关键业务节点（支付、注册等）
    */
   trackBusinessEvent: (eventName: string, data?: Record<string, unknown>) => {
-    // 上报到 Sentry
-    Sentry.captureMessage(`Business: ${eventName}`, 'info');
-
-    // 同时添加面包屑
-    Sentry.addBreadcrumb({
-      message: eventName,
-      category: 'business',
-      data,
-      level: 'info',
-    });
+    console.log(`[monitoring] Business event: ${eventName}`, data || '');
 
     // 可选：同时上报到自建分析
     if (typeof window !== 'undefined') {
@@ -98,31 +94,17 @@ export const monitoring = {
    * 追踪 API 错误
    */
   trackApiError: (endpoint: string, error: unknown, requestData?: unknown) => {
-    Sentry.captureException(error, {
-      extra: {
-        endpoint,
-        requestData,
-        timestamp: new Date().toISOString(),
-      },
-      tags: {
-        type: 'api_error',
-        endpoint,
-      },
-    });
+    console.error(`[monitoring] API error at ${endpoint}:`, error);
+    if (requestData) {
+      console.error('[monitoring] Request data:', requestData);
+    }
   },
 
   /**
    * 追踪页面性能
    */
   trackWebVitals: (metric: { name: string; value: number; id: string }) => {
-    Sentry.captureMessage(`Web Vital: ${metric.name}`, {
-      level: 'info',
-      extra: {
-        name: metric.name,
-        value: metric.value,
-        id: metric.id,
-      },
-    });
+    console.log(`[monitoring] Web Vital: ${metric.name} = ${metric.value} (id: ${metric.id})`);
   },
 };
 
@@ -131,11 +113,8 @@ export const monitoring = {
  * 用于 React 错误边界组件
  */
 export function handleError(error: Error, errorInfo: React.ErrorInfo) {
-  Sentry.captureException(error, {
-    extra: {
-      componentStack: errorInfo.componentStack,
-    },
-  });
+  console.error('[monitoring] React error boundary:', error);
+  console.error('[monitoring] Component stack:', errorInfo.componentStack);
 }
 
 /**
@@ -143,15 +122,13 @@ export function handleError(error: Error, errorInfo: React.ErrorInfo) {
  * 用于显示错误报告对话框
  */
 export function getLastEventId(): string | null {
-  return Sentry.lastEventId() || null;
+  // 已移除 Sentry，返回 null
+  return null;
 }
 
 /**
  * 显示用户反馈对话框
  */
 export function showFeedbackDialog(eventId?: string) {
-  const id = eventId || Sentry.lastEventId();
-  if (id) {
-    Sentry.showReportDialog({ eventId: id });
-  }
+  console.warn('[monitoring] showFeedbackDialog is deprecated without Sentry');
 }

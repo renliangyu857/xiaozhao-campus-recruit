@@ -6,16 +6,18 @@ import { monitoring } from '@/lib/monitoring';
 export default function SentryTestPage() {
   const [result, setResult] = useState<string>('');
 
-  // 测试 1: 触发简单错误
+  // 测试 1: 触发简单错误（每次都产生新问题）
   const triggerSimpleError = () => {
+    const errorId = Math.random().toString(36).substr(2, 9);
     try {
-      throw new Error('这是一个 Sentry 测试错误！');
+      throw new Error(`这是一个 Sentry 测试错误 - ${errorId}`);
     } catch (error) {
       monitoring.captureException(error as Error, {
         testType: 'simple-error',
+        errorId,
         timestamp: new Date().toISOString()
       });
-      setResult('✅ 简单错误已上报到 Sentry！');
+      setResult(`✅ 测试错误 ${errorId} 已上报到 Sentry！`);
     }
   };
 

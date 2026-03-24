@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
-import * as Sentry from '@sentry/nextjs';
+import { monitoring } from '@/lib/monitoring';
 
 /**
- * Sentry 测试 API
- * 用于验证 Sentry 是否正确配置
+ * 监控测试 API
+ * 用于验证监控系统是否正确配置
  */
 export async function GET() {
   // 测试消息上报
-  Sentry.captureMessage('Sentry test API called', 'info');
+  monitoring.captureMessage('Monitoring test API called', 'info');
 
   return NextResponse.json({
     status: 'ok',
-    sentry: 'configured',
+    monitoring: 'configured',
     timestamp: new Date().toISOString(),
   });
 }
@@ -25,12 +25,13 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     if (body.triggerError) {
-      throw new Error('This is a test error for Sentry');
+      throw new Error('This is a test error for monitoring');
     }
 
     return NextResponse.json({ success: true });
-  } catch {
-    // 错误会自动被 Sentry 捕获
+  } catch (error) {
+    // 错误会被监控系统捕获
+    monitoring.captureException(error as Error);
     return NextResponse.json(
       { error: 'Test error triggered' },
       { status: 500 }

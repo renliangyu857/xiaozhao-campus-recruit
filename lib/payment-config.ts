@@ -19,7 +19,7 @@ export const PRODUCT_CONFIG = {
         });
 
         // 首月5.8元，之后9.9元（单位：分）
-        return hasPurchased ? 10 : 10;
+        return hasPurchased ? 990 : 580;
       },
       originalPrice: 990, // 原价9.9元
       durationDays: 30,

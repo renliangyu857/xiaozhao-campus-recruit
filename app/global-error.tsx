@@ -1,9 +1,9 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
 import { useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { monitoring } from '@/lib/monitoring';
 
 export default function GlobalError({
   error,
@@ -13,8 +13,8 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // 上报错误到 Sentry
-    Sentry.captureException(error);
+    // 上报错误到监控系统
+    monitoring.captureException(error);
   }, [error]);
 
   return (
@@ -52,22 +52,6 @@ export default function GlobalError({
               >
                 返回首页
               </Link>
-            </div>
-
-            {/* 用户反馈按钮 */}
-            <div className="mt-6 pt-6 border-t border-gray-100">
-              <button
-                onClick={() => {
-                  // 触发 Sentry 反馈对话框
-                  const eventId = Sentry.lastEventId();
-                  if (eventId) {
-                    Sentry.showReportDialog({ eventId });
-                  }
-                }}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                报告问题
-              </button>
             </div>
           </div>
         </div>
