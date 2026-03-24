@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from '@sentry/nextjs';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
@@ -56,5 +57,30 @@ const nextConfig: NextConfig = {
   },
 };
 
-// 导出配置
-export default nextConfig;
+// Sentry 配置
+const sentryWebpackPluginOptions = {
+  // Sentry 组织信息
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+
+  // 仅在 CI 环境静默
+  silent: !process.env.CI,
+
+  // 上传更广泛的客户端文件
+  widenClientFileUpload: true,
+
+  // 通过隧道路由绕过广告拦截器
+  tunnelRoute: '/monitoring-tunnel',
+
+  // 隐藏 source maps
+  hideSourceMaps: true,
+
+  // 禁用 logger
+  disableLogger: true,
+
+  // 自动检测 Vercel Cron Monitors
+  automaticVercelMonitors: true,
+};
+
+// 导出配置（带 Sentry）
+export default withSentryConfig(nextConfig, sentryWebpackPluginOptions);
