@@ -58,3 +58,11 @@
 - **修复**：在 app/sentry-test/page.tsx 中添加了「测试飞书告警」按钮
 - **功能**：可以直接调用 /api/sentry/webhook?test=1 测试飞书告警功能
 - **注意**：需要配置 FEISHU_WEBHOOK_URL 环境变量才能正常工作
+
+## eslint 错误修复（第 2 次）
+
+- **问题**：部署时 eslint 报错：`app/api/vip/plans/route.ts` 第 5 行 `request` 参数定义但未使用
+- **位置**：`app/api/vip/plans/route.ts` 中的 GET 函数
+- **原因**：添加了 NextRequest 类型的 request 参数但没有使用
+- **修复**：移除了未使用的 request 参数
+- **结果**：现在 eslint 检查通过

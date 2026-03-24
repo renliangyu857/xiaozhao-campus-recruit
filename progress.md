@@ -21,3 +21,7 @@
 - 2026-03-23：添加直接测试飞书告警的功能：
   - 在 app/sentry-test/page.tsx 中添加了「测试飞书告警」按钮
   - 可以直接测试飞书告警 Hook 是否工作
+- 2026-03-23：修复 eslint 错误：
+  - 发现 app/api/vip/plans/route.ts 中 request 参数定义但未使用
+  - 移除了未使用的 request 参数
+  - 现在 eslint 检查通过

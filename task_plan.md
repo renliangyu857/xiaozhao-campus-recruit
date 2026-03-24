@@ -18,7 +18,8 @@
 | 5. 检查并修复 eslint 错误 | complete | 修复了 lib/monitoring.ts 中 eventId 未使用的错误 |
 | 6. 修复 VIP 价格显示问题 | complete | 修复了 app/api/vip/plans/route.ts，现在调用真实的 getProductPrice 函数 |
 | 7. 添加直接测试飞书告警的功能 | complete | 在 app/sentry-test/page.tsx 中添加了「测试飞书告警」按钮 |
-| 8. 提交并推送代码 | in_progress | 将最终修改提交到仓库 |
+| 8. 提交并推送代码 | complete | 将最终修改提交到仓库 |
+| 9. 修复 eslint 错误 | complete | 移除了 app/api/vip/plans/route.ts 中未使用的 request 参数 |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
