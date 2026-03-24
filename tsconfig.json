@@ -37,6 +37,8 @@
     "**/*.mts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "baoyu-skills",
+    "Claude-to-IM-skill"
   ]
 }
