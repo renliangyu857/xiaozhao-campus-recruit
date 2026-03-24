@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getSessionUserId } from "@/lib/session";
 import { getProductPrice } from "@/lib/payment-config";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const userId = await getSessionUserId();
 
