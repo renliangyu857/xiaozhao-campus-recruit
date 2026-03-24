@@ -15,3 +15,9 @@
   - 发现 `lib/monitoring.ts` 第 132 行 `eventId` 参数定义但未使用的错误
   - 从 git 历史恢复了完整的 Sentry 相关文件
   - 现在 eslint 检查只有警告，没有错误了
+- 2026-03-23：修复 VIP 价格显示问题：
+  - 发现 app/api/vip/plans/route.ts 中月度会员价格是硬编码的 0.1 元
+  - 修改为调用 getProductPrice 函数，现在显示真实价格 5.8 元
+- 2026-03-23：添加直接测试飞书告警的功能：
+  - 在 app/sentry-test/page.tsx 中添加了「测试飞书告警」按钮
+  - 可以直接测试飞书告警 Hook 是否工作

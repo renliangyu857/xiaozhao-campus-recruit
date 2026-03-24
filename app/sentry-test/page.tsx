@@ -57,6 +57,22 @@ export default function SentryTestPage() {
     setResult('✅ 消息已发送！');
   };
 
+  // 测试 6: 直接测试飞书告警
+  const testFeishuAlert = async () => {
+    try {
+      const response = await fetch('/api/sentry/webhook?test=1&level=error');
+      const data = await response.json();
+
+      if (data.success) {
+        setResult('✅ 飞书告警测试成功！');
+      } else {
+        setResult(`❌ 飞书告警测试失败: ${data.error}`);
+      }
+    } catch (error) {
+      setResult(`❌ 飞书告警测试失败: ${(error as Error).message}`);
+    }
+  };
+
   return (
     <div className="min-h-screen p-8">
       <div className="max-w-2xl mx-auto">
@@ -97,6 +113,13 @@ export default function SentryTestPage() {
             className="w-full p-4 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors"
           >
             5. 发送消息
+          </button>
+
+          <button
+            onClick={testFeishuAlert}
+            className="w-full p-4 bg-teal-500 hover:bg-teal-600 text-white rounded-lg font-medium transition-colors"
+          >
+            6. 测试飞书告警
           </button>
         </div>
 
