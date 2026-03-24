@@ -11,3 +11,7 @@
   - `app/api/sentry-example-api/route.ts` - 恢复 Sentry 测试接口
   - `sentry.edge.config.ts`、`sentry.server.config.ts`、`sentry.client.config.ts` - 恢复 Sentry 配置文件
 - 2026-03-23：保留项目自己的告警 hook：`app/api/sentry/webhook/route.ts` 用于接收外部告警并转发到飞书
+- 2026-03-23：检查并修复 eslint 错误：
+  - 发现 `lib/monitoring.ts` 第 132 行 `eventId` 参数定义但未使用的错误
+  - 从 git 历史恢复了完整的 Sentry 相关文件
+  - 现在 eslint 检查只有警告，没有错误了

@@ -34,3 +34,11 @@
 - 支持发送到飞书群聊和私聊
 - 支持各种告警级别和交互式卡片
 - 保持与外部系统的兼容性（如 Sentry 格式的 Webhook）
+
+## eslint 错误修复
+
+- **问题**：部署时 eslint 报错：`lib/monitoring.ts` 第 132 行 `eventId` 参数定义但未使用
+- **位置**：`lib/monitoring.ts` 中的 `showFeedbackDialog` 函数
+- **原因**：之前对 Sentry 集成的修改不完整，导致函数定义与实际实现不一致
+- **修复**：从 git 历史（commit 6ad4259）恢复了完整的 Sentry 相关文件
+- **结果**：现在 eslint 检查只有警告，没有错误了
