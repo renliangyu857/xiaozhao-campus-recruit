@@ -6,12 +6,13 @@ import "./hero-styles.css";
 import { useRouter } from "next/navigation";
 import { Industry, RecruitType, ApplyStatus } from "@/lib/types";
 import { JobCard } from "@/components/JobCard";
+import { JobTable } from "@/components/JobTable";
 import { fetchJobsPage, updateJobStatus, type PageResult } from "@/lib/jobService";
 import { ApiError } from "@/lib/apiClient";
 import { getFavoriteJobIds, toggleFavoriteJobId } from "@/lib/favoriteService";
 import { useUser } from "@/components/UserContext";
 import type { Job, FilterState } from "@/lib/types";
-import { Search, Filter, Lock, Sparkles, X, MapPin, Briefcase, ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { Search, Filter, Lock, Sparkles, X, MapPin, Briefcase, ChevronLeft, ChevronRight, Star, Grid, List } from "lucide-react";
 import { useRef } from "react";
 
 export default function HomePage() {
@@ -35,6 +36,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [showVipExpiringSoon, setShowVipExpiringSoon] = useState(false);
   const [showVipExpired, setShowVipExpired] = useState(false);
+  const [layoutType, setLayoutType] = useState<'card' | 'table'>('card');
   const hasAutoLoaded = useRef(false);
 
   // 检查VIP状态，显示到期提醒
@@ -252,15 +254,43 @@ export default function HomePage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-900">{showFavoritesOnly ? "我的收藏" : "校招信息，一站搞定"}</h2>
-            {pageResult && (
-              <span className="text-xs font-medium text-slate-500 bg-white px-2 py-1 rounded-md border border-slate-100">
-                {showFavoritesOnly
-                  ? `共 ${listToShow.length} 条`
-                  : typeof pageResult.totalElements === "number"
-                    ? `共找到 ${pageResult.totalElements} 条`
-                    : `本页 ${displayJobs.length} 条`}
-              </span>
-            )}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center bg-white border border-slate-200 rounded-lg p-1">
+                <button
+                  onClick={() => setLayoutType('card')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    layoutType === 'card'
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                  title="卡片布局"
+                >
+                  <Grid size={16} className="inline mr-1" />
+                  卡片
+                </button>
+                <button
+                  onClick={() => setLayoutType('table')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    layoutType === 'table'
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                  title="表格布局"
+                >
+                  <List size={16} className="inline mr-1" />
+                  表格
+                </button>
+              </div>
+              {pageResult && (
+                <span className="text-xs font-medium text-slate-500 bg-white px-2 py-1 rounded-md border border-slate-100">
+                  {showFavoritesOnly
+                    ? `共 ${listToShow.length} 条`
+                    : typeof pageResult.totalElements === "number"
+                      ? `共找到 ${pageResult.totalElements} 条`
+                      : `本页 ${displayJobs.length} 条`}
+                </span>
+              )}
+            </div>
           </div>
 
           {loading && user && (
@@ -413,21 +443,30 @@ export default function HomePage() {
           )}
 
           {!loading && displayJobs.length > 0 && (
-            <div className="grid grid-cols-1 gap-4">
+            <div>
               {listToShow.length === 0 && showFavoritesOnly ? (
                 <div className="bg-white rounded-2xl border border-slate-100 p-8 text-center text-slate-500">
                   当前页暂无收藏，点击职位卡片上的星标可收藏
                 </div>
+              ) : layoutType === 'card' ? (
+                <div className="grid grid-cols-1 gap-4">
+                  {listToShow.map((job) => (
+                    <JobCard
+                      key={job.id}
+                      job={job}
+                      onStatusChange={handleUpdateJobStatus}
+                      isFavorite={favoriteIds.has(job.id)}
+                      onToggleFavorite={user ? handleToggleFavorite : undefined}
+                    />
+                  ))}
+                </div>
               ) : (
-                listToShow.map((job) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    onStatusChange={handleUpdateJobStatus}
-                    isFavorite={favoriteIds.has(job.id)}
-                    onToggleFavorite={user ? handleToggleFavorite : undefined}
-                  />
-                ))
+                <JobTable
+                  jobs={listToShow}
+                  onStatusChange={handleUpdateJobStatus}
+                  onToggleFavorite={user ? handleToggleFavorite : undefined}
+                  favoriteIds={favoriteIds}
+                />
               )}
             </div>
           )}
