@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
   const deadlineDays = searchParams.get("deadlineDays") ?? undefined;
   const roles = searchParams.get("roles") ?? undefined;
   const onlyNewToday = searchParams.get("onlyNewToday") === "true";
+  const hideExpired = searchParams.get("hideExpired") === "true";
   const includeTotal = searchParams.get("includeTotal") === "true";
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
   const size = Math.min(100, Math.max(1, parseInt(searchParams.get("size") ?? "20", 10)));
@@ -62,14 +63,18 @@ export async function GET(request: NextRequest) {
   if (onlyNewToday) {
     where.createdAt = { gte: todayStart };
   }
+  if (hideExpired) {
+    where.endDate = { gte: now.toISOString().slice(0, 10) };
+  }
 
-  const whereKey = cacheKey("jobs:where:v1", {
+  const whereKey = cacheKey("jobs:where:v3", {
     industry: industry && industry !== "ALL" ? industry : null,
     type: type && type !== "ALL" ? type : null,
     location: location?.trim() || null,
     deadlineDays: deadlineDays && deadlineDays !== "ALL" ? deadlineDays : null,
     roles: roles?.trim() || null,
     onlyNewToday,
+    hideExpired,
   });
   const listKey = `${whereKey}:p${page}:s${size}`;
   const countKey = `${whereKey}:count`;

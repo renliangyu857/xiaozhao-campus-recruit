@@ -14,6 +14,7 @@ export interface PageResult<T> {
 export async function fetchJobsPage(
   filters: FilterState,
   onlyNewToday: boolean,
+  hideExpired: boolean,
   page = 0,
   size = 30
 ): Promise<PageResult<Job>> {
@@ -24,6 +25,7 @@ export async function fetchJobsPage(
   if (filters.deadlineDays !== "ALL") params.set("deadlineDays", filters.deadlineDays);
   if (filters.roles) params.set("roles", filters.roles);
   if (onlyNewToday) params.set("onlyNewToday", "true");
+  if (hideExpired) params.set("hideExpired", "true");
   params.set("page", String(Math.max(0, page)));
   params.set("size", String(size));
   if (page === 0) params.set("includeTotal", "true");

@@ -175,12 +175,12 @@ export function JobTable({ jobs, onStatusChange, onToggleFavorite, favoriteIds }
               </td>
 
               <td className="px-4 py-4">
-                <div className="flex gap-1.5">
+                <div className="flex gap-2 flex-nowrap min-w-max">
                   <a
                     href={job.announcementLink}
                     target="_blank"
                     rel="noreferrer"
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 transition-all border border-slate-200 hover:border-slate-300"
+                    className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 transition-all border border-slate-200 hover:border-slate-300 whitespace-nowrap"
                   >
                     简章
                   </a>
@@ -188,7 +188,7 @@ export function JobTable({ jobs, onStatusChange, onToggleFavorite, favoriteIds }
                     href={job.applyLink}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-slate-800 to-slate-700 hover:from-[#FF6B4A] hover:to-[#FF8F7A] transition-all shadow-md hover:shadow-lg"
+                    className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-slate-800 to-slate-700 hover:from-[#FF6B4A] hover:to-[#FF8F7A] transition-all shadow-md hover:shadow-lg whitespace-nowrap"
                   >
                     去投递
                     <ExternalLink size={10} />

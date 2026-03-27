@@ -26,6 +26,7 @@ export default function HomePage() {
     roles: "",
   });
   const [onlyNewToday, setOnlyNewToday] = useState(false);
+  const [hideExpired, setHideExpired] = useState(true);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(0);
@@ -75,7 +76,7 @@ export default function HomePage() {
       setTimeout(() => {
         // 使用函数式调用确保获取最新的 user 状态
         if (user) {
-          fetchJobsPage(filters, onlyNewToday, 0, pageSize)
+          fetchJobsPage(filters, onlyNewToday, hideExpired, 0, pageSize)
             .then((result) => {
               setPageResult(result);
               setDisplayJobs(result.content);
@@ -99,7 +100,7 @@ export default function HomePage() {
 
   const listToShow = showFavoritesOnly ? displayJobs.filter((j) => favoriteIds.has(j.id)) : displayJobs;
 
-  const loadPage = async (page: number, resetPage: boolean, onlyNewTodayOverride?: boolean) => {
+  const loadPage = async (page: number, resetPage: boolean, onlyNewTodayOverride?: boolean, hideExpiredOverride?: boolean) => {
     if (!user) {
       alert("请先登录后操作");
       return;
@@ -110,10 +111,11 @@ export default function HomePage() {
       return;
     }
     const useOnlyNewToday = onlyNewTodayOverride ?? onlyNewToday;
+    const useHideExpired = hideExpiredOverride ?? hideExpired;
     setShowPaywall(false);
     setLoading(true);
     try {
-      const result = await fetchJobsPage(filters, useOnlyNewToday, page, pageSize);
+      const result = await fetchJobsPage(filters, useOnlyNewToday, useHideExpired, page, pageSize);
       setPageResult(result);
       setDisplayJobs(result.content ?? []);
       setCurrentPage(result.number);
@@ -134,7 +136,7 @@ export default function HomePage() {
     // 重置今日新增和收藏过滤状态，确保查询筛选能触发搜索
     setOnlyNewToday(false);
     setShowFavoritesOnly(false);
-    loadPage(0, true, false);
+    loadPage(0, true, false, hideExpired);
   };
   const handlePageChange = (newPage: number) => {
     if (newPage < 0) return;
@@ -238,6 +240,16 @@ export default function HomePage() {
                 className={`px-3 py-2 rounded-lg text-xs font-medium border flex items-center gap-1.5 ${onlyNewToday ? "bg-red-50 border-red-200 text-red-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
               >
                 <Sparkles size={14} className={onlyNewToday ? "fill-current" : ""} /> 今日新增
+              </button>
+              <button
+                onClick={() => {
+                  const next = !hideExpired;
+                  setHideExpired(next);
+                  if (user) loadPage(0, true, undefined, next);
+                }}
+                className={`px-3 py-2 rounded-lg text-xs font-medium border flex items-center gap-1.5 ${hideExpired ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+              >
+                <X size={14} className={hideExpired ? "fill-current" : ""} /> {hideExpired ? "显示已截止" : "隐藏已截止"}
               </button>
               {!user?.isVip && (
                 <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200 cursor-pointer hover:bg-amber-100" onClick={() => setShowPaywall(true)}>
@@ -502,6 +514,7 @@ export default function HomePage() {
                 onClick={() => {
                   setFilters({ industry: "ALL", type: "ALL", location: "", deadlineDays: "ALL", roles: "" });
                   setOnlyNewToday(false);
+                  setHideExpired(true);
                   setTimeout(handleSearch, 0);
                 }}
                 className="mt-4 text-blue-600 font-medium hover:underline text-sm"
