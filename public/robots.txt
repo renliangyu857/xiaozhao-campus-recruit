@@ -1,0 +1,49 @@
+# *
+User-agent: *
+Allow: /
+
+# *
+User-agent: *
+Allow: /exam
+
+# *
+User-agent: *
+Allow: /progress
+
+# *
+User-agent: *
+Allow: /vip
+
+# *
+User-agent: *
+Allow: /invite
+
+# *
+User-agent: *
+Disallow: /api/
+
+# *
+User-agent: *
+Disallow: /auth/
+
+# *
+User-agent: *
+Disallow: /orders/
+
+# *
+User-agent: *
+Disallow: /sentry-test
+
+# *
+User-agent: *
+Disallow: /_next/
+
+# *
+User-agent: *
+Disallow: /static/
+
+# Host
+Host: https://xiaozhaomiao.cn
+
+# Sitemaps
+Sitemap: https://xiaozhaomiao.cn/sitemap.xml

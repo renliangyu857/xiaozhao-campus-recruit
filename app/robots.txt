@@ -1,0 +1,20 @@
+# 校招喵 - 校招信息平台
+# https://xiaozhaomiao.cn
+
+User-agent: *
+Allow: /
+Allow: /exam
+Allow: /progress
+Allow: /vip
+Allow: /invite
+
+Disallow: /api/
+Disallow: /auth/
+Disallow: /orders/
+Disallow: /sentry-test
+Disallow: /_next/
+Disallow: /static/
+Disallow: /*?
+
+Sitemap: https://xiaozhaomiao.cn/sitemap.xml
+Sitemap: https://xiaozhaomiao.cn/sitemap-0.xml

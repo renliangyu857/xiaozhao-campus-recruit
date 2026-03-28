@@ -440,6 +440,54 @@ export default function HomePage() {
                     </div>
                   ))}
                 </div>
+
+                {/* FAQ 内容块 - 提高AI引用性 */}
+                <div className="mt-20 max-w-3xl mx-auto text-left animate-slide-up" style={{ animationDelay: '0.9s', opacity: 0, animationFillMode: 'forwards' }}>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-6 text-center">校招喵常见问题</h3>
+
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
+                      <h4 className="text-lg font-semibold text-slate-900 mb-3">校招喵提供哪些服务？</h4>
+                      <div className="text-slate-600 leading-relaxed">
+                        校招喵是一站式校园招聘服务平台，提供：
+                        <ul className="mt-2 ml-5 space-y-1 list-disc text-slate-600">
+                          <li>全网校招信息聚合与智能筛选</li>
+                          <li>个人投递进度管理与提醒</li>
+                          <li>名企内推码库与申请指导</li>
+                          <li>笔面试资料库与备考资源</li>
+                          <li>简历优化与求职技巧分享</li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
+                      <h4 className="text-lg font-semibold text-slate-900 mb-3">如何使用职位查询功能？</h4>
+                      <div className="text-slate-600 leading-relaxed">
+                        新用户登录即可获得2天VIP体验，VIP会员可解锁完整查询功能：
+                        <ul className="mt-2 ml-5 space-y-1 list-disc text-slate-600">
+                          <li>按行业、类型、地点、截止时间筛选职位</li>
+                          <li>支持关键词搜索和高级筛选</li>
+                          <li>实时查看职位详情和申请方式</li>
+                          <li>一键添加到个人进度管理</li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
+                      <h4 className="text-lg font-semibold text-slate-900 mb-3">VIP会员有哪些权益？</h4>
+                      <div className="text-slate-600 leading-relaxed">
+                        VIP会员享受以下高级权益：
+                        <ul className="mt-2 ml-5 space-y-1 list-disc text-slate-600">
+                          <li>无限次职位查询和筛选</li>
+                          <li>完整的内推码库访问权限</li>
+                          <li>专属笔面试资料下载</li>
+                          <li>优先客服支持和问题解答</li>
+                          <li>简历优化和面试指导服务</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

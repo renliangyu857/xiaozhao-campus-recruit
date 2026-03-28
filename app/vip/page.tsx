@@ -12,6 +12,8 @@ import { PaymentSuccessModal } from "@/components/PaymentSuccessModal";
 import { PaymentQRCodeModal } from "@/components/PaymentQRCodeModal";
 import { createPayment, type CreatePaymentResult } from "@/lib/payment";
 import type { VipPlan, VipDashboard } from "@/lib/types";
+import { SchemaOrg } from "@/components/SchemaOrg";
+import { VIP_PRODUCT_DATA } from "@/components/StructuredData";
 
 function buildVipTickerMessages(): string[] {
   const plans = ["1个月会员", "3个月会员", "年度会员"];
@@ -177,7 +179,13 @@ export default function VIPPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFF8F5] pt-20 pb-12 px-4 sm:px-6 lg:px-8">
+    <>
+      {/* 产品结构化数据 */}
+      <SchemaOrg
+        type="Product"
+        data={VIP_PRODUCT_DATA}
+      />
+      <div className="min-h-screen bg-[#FFF8F5] pt-20 pb-12 px-4 sm:px-6 lg:px-8">
       {/* 顶部滚动通知 */}
       <div className="fixed top-16 left-0 right-0 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-b border-orange-100 py-2.5 overflow-hidden z-40">
         <div className="flex justify-center items-center gap-2">
@@ -472,5 +480,6 @@ export default function VIPPage() {
         }}
       />
     </div>
+    </>
   );
 }

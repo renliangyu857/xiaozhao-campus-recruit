@@ -19,8 +19,60 @@ const notoSerif = Noto_Serif_SC({
 });
 
 export const metadata: Metadata = {
-  title: "校招喵 - 你的校招助手",
-  description: "校招信息聚合、投递进度管理、内推码库，一站式助你拿下心仪Offer",
+  title: {
+    default: "校招喵 - 校招信息聚合平台 | 内推码库 | 投递进度管理",
+    template: "%s | 校招喵 - 你的校招助手",
+  },
+  description: "校招喵提供全网校招信息聚合、投递进度管理、名企内推码库、笔面试资料库服务，助你一站式拿下心仪Offer",
+  keywords: ["校招", "校招信息", "内推码", "投递进度管理", "笔面试资料", "校园招聘", "2026校招", "实习信息"],
+  authors: [{ name: "校招喵", url: "https://xiaozhaomiao.cn" }],
+  creator: "校招喵",
+  publisher: "校招喵",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  openGraph: {
+    title: "校招喵 - 你的校招助手",
+    description: "校招信息聚合、投递进度管理、内推码库，一站式助你拿下心仪Offer",
+    url: "https://xiaozhaomiao.cn",
+    siteName: "校招喵",
+    locale: "zh_CN",
+    type: "website",
+    images: [
+      {
+        url: "https://xiaozhaomiao.cn/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "校招喵 - 校招信息聚合平台",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "校招喵 - 你的校招助手",
+    description: "校招信息聚合、投递进度管理、内推码库，一站式助你拿下心仪Offer",
+    creator: "@xiaozhaomiao",
+    images: ["https://xiaozhaomiao.cn/twitter-image.jpg"],
+  },
+  verification: {
+    google: "your-google-verification-code", // 这里需要替换为实际的Google验证代码
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "校招喵",
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export default function RootLayout({
