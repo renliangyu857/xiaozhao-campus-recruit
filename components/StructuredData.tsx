@@ -31,10 +31,15 @@ interface WebSite {
 }
 
 interface Offer {
+  [key: string]: unknown;
   '@type': string;
   name: string;
+  description?: string;
   price: string;
   priceCurrency: string;
+  priceValidUntil?: string;
+  itemCondition?: string;
+  availability?: string;
 }
 
 interface AggregateOffer {
