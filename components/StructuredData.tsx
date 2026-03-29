@@ -7,7 +7,7 @@ interface ContactPoint {
 }
 
 interface Organization {
-  [key: string]: any;
+  [key: string]: unknown;
   name: string;
   url: string;
   logo: string;
@@ -22,7 +22,7 @@ interface SearchAction {
 }
 
 interface WebSite {
-  [key: string]: any;
+  [key: string]: unknown;
   name: string;
   url: string;
   description: string;
@@ -44,7 +44,7 @@ interface AggregateOffer {
 }
 
 interface Product {
-  [key: string]: any;
+  [key: string]: unknown;
   name: string;
   description: string;
   brand: Organization;
