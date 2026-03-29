@@ -64,7 +64,6 @@ export const metadata: Metadata = {
   },
   verification: {
     google: "eqzZEOKe4P1fjmMOmLp_OgdbZKsqUebACD2F_JlA85Y", // Google验证代码（只需要等号后面的值）
-    baidu: "", // 留空，可在需要时添加
   },
   appleWebApp: {
     capable: true,
