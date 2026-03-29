@@ -63,7 +63,7 @@ export const metadata: Metadata = {
     images: ["https://xiaozhaomiao.cn/twitter-image.jpg"],
   },
   verification: {
-    google: "eqzZEOKe4P1fjMOMLp_OgdbZKsqUebACD2F_JIA85Y", // Google验证代码
+    google: "eqzZEOKe4P1fjmMOmLp_OgdbZKsqUebACD2F_JlA85Y", // Google验证代码（只需要等号后面的值）
     baidu: "", // 留空，可在需要时添加
   },
   appleWebApp: {
