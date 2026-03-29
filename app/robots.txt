@@ -1,13 +1,14 @@
-# 校招喵 - 校招信息平台
+# 校招喵 - robots.txt
 # https://xiaozhaomiao.cn
 
+# 搜索引擎爬虫 - 通用规则
 User-agent: *
 Allow: /
 Allow: /exam
 Allow: /progress
 Allow: /vip
 Allow: /invite
-
+Allow: /referral-codes
 Disallow: /api/
 Disallow: /auth/
 Disallow: /orders/
@@ -16,5 +17,44 @@ Disallow: /_next/
 Disallow: /static/
 Disallow: /*?
 
+# AI搜索引擎爬虫 - 明确允许（GEO优化）
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: GoogleOther
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: FacebookBot
+Allow: /
+
+# AI爬虫 - 阻止（训练数据使用或低价值）
+User-agent: Bytespider
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+# 站点地图
 Sitemap: https://xiaozhaomiao.cn/sitemap.xml
 Sitemap: https://xiaozhaomiao.cn/sitemap-0.xml
