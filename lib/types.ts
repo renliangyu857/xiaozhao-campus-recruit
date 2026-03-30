@@ -12,6 +12,8 @@ export enum RecruitType {
   SPRING = "春招",
   INTERN = "实习",
   OTHER = "其他",
+  OVERSEAS = "海外",
+  PARTIAL = "部分",
 }
 
 export enum ApplyStatus {

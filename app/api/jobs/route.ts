@@ -44,57 +44,108 @@ export async function GET(request: NextRequest) {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   const where: Record<string, unknown> = {};
-  if (industry && industry !== "ALL") where.industry = industry;
+  const conditions: any[] = [];
+
+  if (industry && industry !== "ALL") {
+    conditions.push({ industry });
+  }
+
   if (type && type !== "ALL") {
     // 根据类型匹配届数（只判断recruitType字段）
     // 春招/秋招 → 26届
     // 实习 → 27届或更迟
     // 其他 → 25届或更早
+    // 海外 → 海外应届
+    // 部分 → 部分应届
 
+    let typeCondition;
     if (type === "秋招" || type === "春招") {
       // 26届：recruitType包含"26届"
-      where.recruitType = { contains: "26届" };
+      typeCondition = { recruitType: { contains: "26届" } };
     } else if (type === "实习") {
       // 27届或更迟：recruitType包含"27届"或更迟
-      where.OR = [
-        { recruitType: { contains: "27届" } },
-        { recruitType: { contains: "28届" } },
-        { recruitType: { contains: "29届" } },
-        { recruitType: { contains: "30届" } },
-        { recruitType: { contains: "更迟" } }
-      ];
+      typeCondition = {
+        OR: [
+          { recruitType: { contains: "27届" } },
+          { recruitType: { contains: "28届" } },
+          { recruitType: { contains: "29届" } },
+          { recruitType: { contains: "30届" } },
+          { recruitType: { contains: "更迟" } }
+        ]
+      };
     } else if (type === "其他") {
       // 25届或更早：recruitType包含"25届"或更早
-      where.OR = [
-        { recruitType: { contains: "25届" } },
-        { recruitType: { contains: "24届" } },
-        { recruitType: { contains: "23届" } },
-        { recruitType: { contains: "22届" } },
-        { recruitType: { contains: "21届" } },
-        { recruitType: { contains: "20届" } },
-        { recruitType: { contains: "更早" } }
-      ];
+      typeCondition = {
+        OR: [
+          { recruitType: { contains: "25届" } },
+          { recruitType: { contains: "24届" } },
+          { recruitType: { contains: "23届" } },
+          { recruitType: { contains: "22届" } },
+          { recruitType: { contains: "21届" } },
+          { recruitType: { contains: "20届" } },
+          { recruitType: { contains: "更早" } }
+        ]
+      };
+    } else if (type === "海外") {
+      // 海外应届：recruitType包含"海外应届"
+      typeCondition = { recruitType: { contains: "海外应届" } };
+    } else if (type === "部分") {
+      // 部分应届：recruitType包含"部分应届"
+      typeCondition = { recruitType: { contains: "部分应届" } };
+    }
+
+    if (typeCondition) {
+      conditions.push(typeCondition);
     }
   }
+
   if (location && location.trim()) {
-    where.locations = { contains: location.trim() };
+    conditions.push({ locations: { contains: location.trim() } });
   }
+
   if (deadlineDays && deadlineDays !== "ALL") {
     const days = parseInt(deadlineDays, 10);
     if (!isNaN(days)) {
       const d = new Date();
       d.setDate(d.getDate() + days);
-      where.endDate = { gte: now.toISOString().slice(0, 10), lte: d.toISOString().slice(0, 10) };
+      const targetDate = d.toISOString().slice(0, 10);
+      const todayStr = now.toISOString().slice(0, 10);
+
+      // 截止日期筛选：包含有效的日期格式或"招满即止"
+      conditions.push({
+        OR: [
+          {
+            endDate: {
+              gte: todayStr,
+              lte: targetDate
+            }
+          },
+          { endDate: "招满即止" }
+        ]
+      });
     }
   }
+
   if (roles && roles.trim()) {
-    where.roles = { contains: roles.trim() };
+    conditions.push({ roles: { contains: roles.trim() } });
   }
+
   if (onlyNewToday) {
-    where.createdAt = { gte: todayStart };
+    conditions.push({ createdAt: { gte: todayStart } });
   }
+
   if (hideExpired) {
-    where.endDate = { gte: now.toISOString().slice(0, 10) };
+    conditions.push({
+      OR: [
+        { endDate: null },
+        { endDate: "招满即止" },
+        { endDate: { gte: now.toISOString().slice(0, 10) } }
+      ]
+    });
+  }
+
+  if (conditions.length > 0) {
+    where.AND = conditions;
   }
 
   const whereKey = cacheKey("jobs:where:v3", {
