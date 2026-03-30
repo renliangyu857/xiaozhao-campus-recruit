@@ -1,0 +1,38 @@
+name: 每日职位爬取与更新
+
+on:
+  # 定时触发：每天早上9:00
+  schedule:
+    - cron: '0 1 * * *'  # UTC时间，对应北京时间早上9:00
+
+  # 手动触发
+  workflow_dispatch:
+
+jobs:
+  crawl-and-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 运行职位爬取脚本
+        run: npm run crawl:jobs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          UPSTASH_REDIS_URL: ${{ secrets.UPSTASH_REDIS_URL }}
+          UPSTASH_REDIS_TOKEN: ${{ secrets.UPSTASH_REDIS_TOKEN }}
+
+      - name: 发送完成通知（可选）
+        if: always()
+        run: echo "职位爬取任务完成"
