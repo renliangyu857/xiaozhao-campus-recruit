@@ -181,7 +181,7 @@ export default function HomePage() {
                 value={filters.type}
                 onChange={(e) => handleFilterChange("type", e.target.value)}
               >
-                <option value="ALL">所有类型</option>
+                <option value="ALL">所有批次</option>
                 {Object.values(RecruitType).map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}

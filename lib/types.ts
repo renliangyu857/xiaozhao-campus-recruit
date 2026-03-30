@@ -11,6 +11,7 @@ export enum RecruitType {
   FALL = "秋招",
   SPRING = "春招",
   INTERN = "实习",
+  OTHER = "其他",
 }
 
 export enum ApplyStatus {

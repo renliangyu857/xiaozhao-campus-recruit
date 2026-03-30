@@ -45,7 +45,21 @@ export async function GET(request: NextRequest) {
 
   const where: Record<string, unknown> = {};
   if (industry && industry !== "ALL") where.industry = industry;
-  if (type && type !== "ALL") where.recruitType = type;
+  if (type && type !== "ALL") {
+    // 根据类型匹配届数：
+    // 春招/秋招 → 26届
+    // 实习 → 27届或更迟 (实际数据只有25/26，所以实习不匹配任何)
+    // 其他 → 25届或更早 (即25届)
+    if (type === "秋招" || type === "春招") {
+      where.batch = "26";
+      where.recruitType = type;
+    } else if (type === "实习") {
+      // 实习匹配27届或更迟，但目前没有27届数据，所以不匹配任何
+      where.batch = "27"; // 实际没有这个值，所以会返回空
+    } else if (type === "其他") {
+      where.batch = "25";
+    }
+  }
   if (location && location.trim()) {
     where.locations = { contains: location.trim() };
   }
