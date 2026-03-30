@@ -46,18 +46,64 @@ export async function GET(request: NextRequest) {
   const where: Record<string, unknown> = {};
   if (industry && industry !== "ALL") where.industry = industry;
   if (type && type !== "ALL") {
-    // 根据类型匹配届数：
+    // 根据类型匹配届数（注意：recruit_type存的是届数，batch存的是类型！）
     // 春招/秋招 → 26届
-    // 实习 → 27届或更迟 (实际数据只有25/26，所以实习不匹配任何)
-    // 其他 → 25届或更早 (即25届)
-    if (type === "秋招" || type === "春招") {
-      where.batch = "26";
-      where.recruitType = type;
+    // 实习 → 27届或更迟
+    // 其他 → 25届或更早
+
+    // 组合条件用 AND，确保两个条件同时满足
+    const conditions: Record<string, unknown>[] = [];
+
+    // 处理类型筛选（batch字段）
+    if (type === "秋招") {
+      // 秋招：batch为空或非春招/实习/专场
+      conditions.push({
+        OR: [
+          { batch: null },
+          { batch: { notIn: ["春招", "实习", "专场"] } }
+        ]
+      });
+    } else if (type === "春招") {
+      conditions.push({ batch: "春招" });
     } else if (type === "实习") {
-      // 实习匹配27届或更迟，但目前没有27届数据，所以不匹配任何
-      where.batch = "27"; // 实际没有这个值，所以会返回空
+      conditions.push({ batch: "实习" });
+    }
+
+    // 处理届数筛选（recruitType字段，包含届数）
+    if (type === "秋招" || type === "春招") {
+      // 26届：recruitType包含"26届"
+      conditions.push({ recruitType: { contains: "26届" } });
+    } else if (type === "实习") {
+      // 27届或更迟：recruitType包含"27届"或更迟
+      conditions.push({
+        OR: [
+          { recruitType: { contains: "27届" } },
+          { recruitType: { contains: "28届" } },
+          { recruitType: { contains: "29届" } },
+          { recruitType: { contains: "30届" } },
+          { recruitType: { contains: "更迟" } }
+        ]
+      });
     } else if (type === "其他") {
-      where.batch = "25";
+      // 25届或更早：recruitType包含"25届"、"24届"、"23届"或"更早"
+      conditions.push({
+        OR: [
+          { recruitType: { contains: "25届" } },
+          { recruitType: { contains: "24届" } },
+          { recruitType: { contains: "23届" } },
+          { recruitType: { contains: "22届" } },
+          { recruitType: { contains: "21届" } },
+          { recruitType: { contains: "20届" } },
+          { recruitType: { contains: "更早" } }
+        ]
+      });
+    }
+
+    // 合并所有条件
+    if (conditions.length === 1) {
+      Object.assign(where, conditions[0]);
+    } else if (conditions.length > 1) {
+      where.AND = conditions;
     }
   }
   if (location && location.trim()) {
