@@ -93,7 +93,7 @@ model UserInvitation {
 model ReferralCode {
   id            BigInt   @id @default(autoincrement())
   companyName   String   @map("company_name") @db.VarChar(128)
-  code          String   @db.VarChar(128)
+  code          String   @db.VarChar(1024)
   contributorId BigInt?  @map("contributor_id")
   usageCount    Int      @default(0) @map("usage_count")
   isValid       Boolean  @default(true) @map("is_valid")

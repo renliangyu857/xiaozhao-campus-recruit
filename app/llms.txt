@@ -1,0 +1,66 @@
+# 校招喵 - llms.txt
+# https://xiaozhaomiao.cn
+# 为AI爬虫和大型语言模型提供的访问政策
+
+## 概述
+本文件定义了AI爬虫和大型语言模型（LLMs）访问和使用本网站内容的指南。
+
+---
+
+## 允许访问的内容
+以下内容允许AI爬虫和LLMs抓取和引用：
+
+- `/` - 首页
+- `/exam` - 笔面试资料
+- `/vip` - VIP会员服务介绍
+- `/invite` - 邀请好友页面
+- `/referral-codes` - 内推码库
+
+以上页面内容可用于：
+- 回答用户关于校招服务的问题
+- 提供产品和服务的描述
+- 引用校招相关信息
+
+---
+
+## 禁止访问的内容
+以下内容禁止AI爬虫和LLMs抓取：
+
+- `/api/*` - API接口（动态数据）
+- `/auth/*` - 认证相关页面
+- `/orders/*` - 用户订单页面
+- `/progress/*` - 用户个人进度页面（需要登录）
+- `/sentry-test` - 测试页面
+
+禁止：
+- 抓取需要登录的个人数据
+- 大规模抓取整个网站
+- 用于训练商业AI模型而未获得许可
+- 复制网站核心功能
+
+---
+
+## 版权和引用
+如需商业使用本网站内容，请联系：contact@xiaozhaomiao.cn
+
+引用本网站内容时，请注明来源：校招喵 (https://xiaozhaomiao.cn)
+
+---
+
+## AI爬虫标识
+以下AI爬虫被明确允许：
+- GPTBot (OpenAI)
+- ClaudeBot (Anthropic)
+- Google-Extended (Google)
+- PerplexityBot (Perplexity)
+
+---
+
+## 联系方式
+如有疑问，请通过以下方式联系我们：
+- 网站：https://xiaozhaomiao.cn
+- 邮箱：contact@xiaozhaomiao.cn
+
+---
+
+最后更新：2026-03-28
