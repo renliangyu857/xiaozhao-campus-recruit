@@ -24,19 +24,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
-          cache-dependency-path: next-app/package-lock.json
 
       - name: Install dependencies
-        run: |
-          cd next-app
-          npm ci
+        run: npm ci
 
       - name: Run linter
-        run: |
-          cd next-app
-          npm run lint || true
+        run: npm run lint || true
 
   # 测试（如有）
   test:
@@ -48,19 +43,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
-          cache-dependency-path: next-app/package-lock.json
 
       - name: Install dependencies
-        run: |
-          cd next-app
-          npm ci
+        run: npm ci
 
       # - name: Run tests
-      #   run: |
-      #     cd next-app
-      #     npm test
+      #   run: npm test
 
   # 部署到 Vercel
   deploy:
@@ -74,9 +64,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
-          cache-dependency-path: next-app/package-lock.json
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -102,9 +91,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
-          cache-dependency-path: next-app/package-lock.json
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
