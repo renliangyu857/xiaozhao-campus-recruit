@@ -12,6 +12,15 @@ jobs:
   crawl-and-update:
     runs-on: ubuntu-latest
 
+    # 凭据统一在 job 级注入，爬虫通过 process.env 读取（不进源码）
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+      UPSTASH_REDIS_URL: ${{ secrets.UPSTASH_REDIS_URL }}
+      UPSTASH_REDIS_TOKEN: ${{ secrets.UPSTASH_REDIS_TOKEN }}
+      PAPERBALL_COOKIE: ${{ secrets.PAPERBALL_COOKIE }}
+      FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -27,12 +36,12 @@ jobs:
 
       - name: 运行职位爬取脚本
         run: npm run crawl:jobs
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          UPSTASH_REDIS_URL: ${{ secrets.UPSTASH_REDIS_URL }}
-          UPSTASH_REDIS_TOKEN: ${{ secrets.UPSTASH_REDIS_TOKEN }}
 
-      - name: 发送完成通知（可选）
-        if: always()
-        run: echo "职位爬取任务完成"
+      - name: 失败时飞书告警
+        if: failure()
+        run: |
+          if [ -n "$FEISHU_WEBHOOK_URL" ]; then
+            curl -s -X POST "$FEISHU_WEBHOOK_URL" \
+              -H 'Content-Type: application/json' \
+              -d '{"msg_type":"text","content":{"text":"⚠️ 校招职位爬取任务失败，请检查 GitHub Actions 运行日志（很可能是 paperball-edu Cookie 过期，需重新在 Secrets 中更新 PAPERBALL_COOKIE）"}}'
+          fi

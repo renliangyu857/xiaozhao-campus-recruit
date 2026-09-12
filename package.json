@@ -16,7 +16,7 @@
     "postinstall": "prisma generate",
     "xhs:generate": "dotenv -e .env.local -- node scripts/daily-xhs-generator.js",
     "xhs:schedule": "dotenv -e .env.local -- node scripts/scheduled-runner.js",
-    "crawl:jobs": "dotenv -e .env.local -- node scripts/crawl-jobs.js",
+    "crawl:jobs": "node scripts/crawl-jobs.js",
     "postbuild": "next-sitemap"
   },
   "engines": {

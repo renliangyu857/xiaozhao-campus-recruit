@@ -14,11 +14,20 @@ const prisma = new PrismaClient();
 
 // API 配置
 const API_URL = "https://apiv2.paperball-edu.com/aicv/announcements/new_v3";
+
+// 登录凭据从环境变量读取（GitHub Secrets: PAPERBALL_COOKIE）。
+// 不再硬编码到源码，避免凭据泄露，也避免过期后无法感知。
+const PAPERBALL_COOKIE = process.env.PAPERBALL_COOKIE;
+if (!PAPERBALL_COOKIE) {
+  console.error('❌ 未检测到 PAPERBALL_COOKIE 环境变量。请在 GitHub Secrets 中配置 paperball-edu 登录后的完整 Cookie。');
+  process.exit(1);
+}
+
 const HEADERS = {
   'Accept': 'application/json, text/plain, */*',
   'Accept-Language': 'zh-CN,zh;q=0.9',
   'Content-Type': 'application/json',
-  'Cookie': "UM_distinctid=19cb90e190e581-038b2601cf1d57-26061c51-151800-19cb90e190f530; auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzQ5NDUxMzYsInVzZXJfaWQiOjM1NjkyN30.5WGNOALcSNdbSZs17GXWOqovJ4VrWUorICJWu3-Kt74; refresh_token=e6d437b7c61b181294f54165525957ba2c0743d546453e5b59e370a9472c3aab.1776932336",
+  'Cookie': PAPERBALL_COOKIE,
   'Origin': 'https://web.paperball-edu.com',
   'Referer': 'https://web.paperball-edu.com/',
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -215,8 +224,8 @@ async function fetchJobsFromAPI() {
     console.log(`✅ API 爬取成功，获取到 ${jobs.length} 个职位`);
     return jobs;
   } catch (error) {
-    console.error('❌ API 爬取失败:', error.message);
-    return [];
+    // 向上抛出，由 main 统一处理失败退出码（401/鉴权失效/网络错误均视为任务失败，避免静默成功）
+    throw error;
   }
 }
 
@@ -372,6 +381,32 @@ async function sendNotification(jobsCount) {
   }
 }
 
+async function sendFailureAlert(detail) {
+  try {
+    const { FEISHU_WEBHOOK_URL } = process.env;
+    if (!FEISHU_WEBHOOK_URL) {
+      console.log('🚫 未配置飞书 webhook，跳过失败告警');
+      return;
+    }
+
+    const payload = {
+      msg_type: "text",
+      content: {
+        text: `⚠️ 校招职位爬取任务失败！\n⏰ 时间：${new Date().toLocaleString('zh-CN')}\n❌ 原因：${String(detail).slice(0, 200)}`
+      }
+    };
+
+    await axios.post(FEISHU_WEBHOOK_URL, payload, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 30000
+    });
+
+    console.log('🔔 飞书失败告警已发送');
+  } catch (e) {
+    console.error('❌ 飞书失败告警发送失败:', e.message);
+  }
+}
+
 async function main() {
   console.log('🚀 开始执行职位爬取任务...');
 
@@ -380,7 +415,6 @@ async function main() {
     const rawJobs = await fetchJobsFromAPI();
     if (rawJobs.length === 0) {
       console.log('📭 未获取到新职位数据，任务结束');
-      await prisma.$disconnect();
       return;
     }
 
@@ -406,11 +440,10 @@ async function main() {
 
   } catch (error) {
     console.error('❌ 爬取任务失败:', error);
-    await sendNotification(0);
+    await sendFailureAlert(error.message);
     process.exit(1);
   } finally {
     await prisma.$disconnect();
-    process.exit(0);
   }
 }
 
