@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { cacheGet, cacheKey, cacheSet } from "@/lib/cache";
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   const where: Record<string, unknown> = {};
-  const conditions: any[] = [];
+  const conditions: Prisma.JobWhereInput[] = [];
 
   if (industry && industry !== "ALL") {
     conditions.push({ industry });
