@@ -13,7 +13,10 @@ const axios = require('axios');
 const prisma = new PrismaClient();
 
 // API 配置
-const API_URL = "https://apiv2.paperball-edu.com/aicv/announcements/new_v3";
+// 新接口（2026-09 迁移自 /aicv/announcements/new_v3）：
+// 响应外壳为 { data: { objects:[...], total, page, ipp } }，无 code 字段；
+// 请求体用 page/ipp + 复数数组筛选；需会员 Cookie 鉴权。
+const API_URL = "https://apiv2.paperball-edu.com/aicv/dashboard/announcements/member/search";
 
 // 登录凭据从环境变量读取（GitHub Secrets: PAPERBALL_COOKIE）。
 // 不再硬编码到源码，避免凭据泄露，也避免过期后无法感知。
@@ -196,14 +199,17 @@ async function fetchJobsFromAPI() {
 
   try {
     const payload = {
-      query: "",
-      industry_type: 0,
-      recruit_type: 0,
-      scale_type: 0,
-      class_type: 0,
-      city_id: 0,
       page: 1,
-      page_size: 100
+      ipp: 100,
+      industry_types: [],
+      city_ids: [],
+      class_types: [],
+      type: [],
+      scale: [],
+      written_test: [],
+      order_by: 3,
+      expired_look: 1,
+      status: [2]
     };
 
     const response = await axios.post(API_URL, payload, {
@@ -216,12 +222,15 @@ async function fetchJobsFromAPI() {
     }
 
     const data = response.data;
-    if (data.code !== 0 || !data.data?.items) {
-      throw new Error(`API 返回错误: ${data.message || '未知错误'}`);
+    // 新接口外壳：{ data: { objects:[...], total, page, ipp } }，无 code 字段。
+    // 鉴权失败时返回 { data: null, message: "Missing or malformed JWT" }，
+    // 此时 data.data.objects 为 null，下面校验会抛错使任务失败（触发飞书告警）。
+    if (!data?.data?.objects || !Array.isArray(data.data.objects)) {
+      throw new Error(`API 返回结构异常: ${data?.message || '缺少 data.objects'}`);
     }
 
-    const jobs = data.data.items;
-    console.log(`✅ API 爬取成功，获取到 ${jobs.length} 个职位`);
+    const jobs = data.data.objects;
+    console.log(`✅ API 爬取成功，获取到 ${jobs.length} 个职位（total=${data.data.total ?? '?'})`);
     return jobs;
   } catch (error) {
     // 向上抛出，由 main 统一处理失败退出码（401/鉴权失效/网络错误均视为任务失败，避免静默成功）
@@ -231,27 +240,32 @@ async function fetchJobsFromAPI() {
 
 function transformJobData(job) {
   try {
-    // 解析地点信息
+    // 解析地点信息（新接口：cities 为对象数组，取 name 拼成 ";" 分隔串）
     let locations = '';
-    if (job.city_list && Array.isArray(job.city_list) && job.city_list.length > 0) {
-      locations = job.city_list.join(';');
+    if (Array.isArray(job.cities) && job.cities.length > 0) {
+      locations = job.cities.map(c => (c && c.name) || '').filter(Boolean).join(';');
     } else if (job.city_name) {
       locations = job.city_name;
     }
 
+    // 新接口 company 为嵌套对象 { name, company_intro, industry_types, scale, ... }
+    const companyObj = (job.company && typeof job.company === 'object') ? job.company : {};
+    const companyName = companyObj.name || (typeof job.company === 'string' ? job.company : '');
+
     return {
-      company: job.company_name || '',
-      industry: getIndustryNames(job.industry_type),
-      recruitType: getClassNames(job.class_type),
+      announcementId: (typeof job.announcement_id === 'number') ? BigInt(job.announcement_id) : null,
+      company: companyName,
+      industry: getIndustryNames(job.industry_types),
+      recruitType: getClassNames(job.class_types),
       locations: locations,
-      startDate: job.publish_time || '',
-      endDate: job.deadline || '',
+      startDate: job.published_at || '',
+      endDate: job.expired_at || null,
       noWrittenTest: getWrittenTestName(job.written_test) === '无笔试' ? 'true' : 'false',
-      roles: job.recruit_posts || '',
-      announcementLink: job.announcement_link || '',
-      applyLink: job.apply_link || '',
-      remark: job.company_intro || '',
-      batch: getBatchName(job.recruit_type),
+      roles: job.original_jobs || '',
+      announcementLink: job.link || '',
+      applyLink: job.from_url || '',
+      remark: companyObj.company_intro || '',
+      batch: '', // 新接口无 recruit_type，无法可靠推导秋招/春招/实习，留空（前端仅展示、不用于筛选）
       salary: null,
       createdAt: parseCreatedAt(job.created_at)
     };
@@ -264,77 +278,66 @@ function transformJobData(job) {
 async function saveJobsToDB(jobs) {
   if (!jobs || jobs.length === 0) {
     console.log('📭 无新职位数据需要保存');
-    return 0;
+    return { inserted: 0, updated: 0 };
   }
 
-  console.log(`💾 正在保存 ${jobs.length} 个职位到数据库...`);
+  // 仅保留带 announcementId 的职位（新接口必有；缺则跳过，避免唯一键冲突）
+  const valid = jobs.filter(j => j && j.announcementId != null);
+  const skipped = jobs.length - valid.length;
+  if (skipped > 0) {
+    console.warn(`⚠️  跳过 ${skipped} 条缺少 announcementId 的职位`);
+  }
 
-  let insertedCount = 0;
-  const BATCH_SIZE = 50;
+  if (valid.length === 0) {
+    return { inserted: 0, updated: 0 };
+  }
+
+  console.log(`💾 正在按 announcementId 写入 ${valid.length} 个职位（新增/更新分离）...`);
+
+  // 一次性查询已存在的 announcementId，分离新增与更新
+  const ids = valid.map(j => j.announcementId);
+  const existing = await prisma.job.findMany({
+    where: { announcementId: { in: ids } },
+    select: { announcementId: true }
+  });
+  const existingSet = new Set(existing.map(j => j.announcementId));
+
+  const toCreate = valid.filter(j => !existingSet.has(j.announcementId));
+  const toUpdate = valid.filter(j => existingSet.has(j.announcementId));
+
+  let inserted = 0;
+  let updated = 0;
 
   try {
-    for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
-      const batch = jobs.slice(i, i + BATCH_SIZE).filter(job => job !== null);
-
-      // 检查批次中是否有已存在的职位
-      const existingJobs = await prisma.job.findMany({
-        where: {
-          OR: batch.map(job => ({
-            company: job.company,
-            announcementLink: job.announcementLink
-          }))
-        },
-        select: { id: true, company: true, announcementLink: true }
+    // 新增：批量插入（skipDuplicates 兜底同批重复）
+    if (toCreate.length > 0) {
+      const result = await prisma.job.createMany({
+        data: toCreate,
+        skipDuplicates: true
       });
-
-      const existingJobSet = new Set(existingJobs.map(job =>
-        `${job.company}_${job.announcementLink}`
-      ));
-
-      // 过滤掉已存在的职位
-      const newJobs = batch.filter(job => {
-        const key = `${job.company}_${job.announcementLink}`;
-        return !existingJobSet.has(key);
-      });
-
-      if (newJobs.length > 0) {
-        console.log(`📦 批次 ${Math.floor(i / BATCH_SIZE) + 1} - 新职位: ${newJobs.length} 个`);
-
-        try {
-          // 批量插入
-          const result = await prisma.job.createMany({
-            data: newJobs,
-            skipDuplicates: true
-          });
-          insertedCount += result.count;
-        } catch (batchError) {
-          console.warn('⚠️  批量插入失败，尝试单条插入:', batchError.message);
-
-          // 单条回退
-          for (const job of newJobs) {
-            try {
-              await prisma.job.create({ data: job });
-              insertedCount++;
-            } catch (singleError) {
-              console.warn('⚠️  单条插入失败:', singleError.message);
-            }
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
-        }
-      } else {
-        console.log(`📦 批次 ${Math.floor(i / BATCH_SIZE) + 1} - 无新职位`);
-      }
-
-      if (i + BATCH_SIZE < jobs.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+      inserted = result.count;
+      console.log(`📦 新增 ${inserted} 个职位`);
     }
 
-    console.log(`✅ 保存完成，共新增 ${insertedCount} 个职位`);
-    return insertedCount;
+    // 更新：逐条回写（保留 createdAt 首见时间，不覆盖 announcementId）
+    for (const j of toUpdate) {
+      const { announcementId, createdAt, ...fields } = j;
+      await prisma.job.update({
+        where: { announcementId },
+        data: fields
+      });
+      updated++;
+      if (updated % 20 === 0) await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    if (toUpdate.length > 0) {
+      console.log(`🔄 更新 ${updated} 个已存在职位（截止日/状态等变更已同步）`);
+    }
+
+    console.log(`✅ 写入完成：新增 ${inserted}，更新 ${updated}`);
+    return { inserted, updated };
   } catch (error) {
     console.error('❌ 保存职位数据到数据库失败:', error);
-    return 0;
+    return { inserted, updated };
   }
 }
 
@@ -423,20 +426,21 @@ async function main() {
     const jobs = rawJobs.map(transformJobData).filter(job => job !== null);
 
     // 步骤 3：保存到数据库
-    const jobsCount = await saveJobsToDB(jobs);
+    const { inserted, updated } = await saveJobsToDB(jobs);
 
     // 步骤 4：发送通知
-    if (jobsCount > 0) {
-      await sendNotification(jobsCount);
+    if (inserted > 0) {
+      await sendNotification(inserted);
     } else {
-      console.log('📭 无新职位数据需要发送通知');
+      console.log('📭 无新增职位数据需要发送通知');
     }
 
     // 任务完成
     console.log('\n🎉 职位爬取任务完成！');
     console.log('📊 总爬取职位数：', jobs.length);
     console.log('🔄 有效职位数：', jobs.length);
-    console.log('💾 新增职位数：', jobsCount);
+    console.log('💾 新增职位数：', inserted);
+    console.log('🔁 更新职位数：', updated);
 
   } catch (error) {
     console.error('❌ 爬取任务失败:', error);
@@ -447,4 +451,17 @@ async function main() {
   }
 }
 
-main();
+// 仅当作为脚本直接运行时才启动（被 require 时可用于单元测试，不触发 main）
+if (require.main === module) {
+  main();
+}
+
+// 导出纯函数供单元测试（不影响脚本直接运行）
+module.exports = {
+  transformJobData,
+  getIndustryNames,
+  getClassNames,
+  getWrittenTestName,
+  getBatchName,
+  parseCreatedAt,
+};

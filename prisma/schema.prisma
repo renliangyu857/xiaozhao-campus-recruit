@@ -27,6 +27,7 @@ model AppUser {
 
 model Job {
   id               BigInt   @id @default(autoincrement())
+  announcementId   BigInt?  @unique @map("announcement_id")
   company          String  @db.VarChar(128)
   industry         String  @db.VarChar(32)
   recruitType      String  @map("recruit_type") @db.VarChar(32)

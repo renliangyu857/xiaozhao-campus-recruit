@@ -7,6 +7,11 @@ on:
 
   # 手动触发
   workflow_dispatch:
+    inputs:
+      reset:
+        description: '清空 job 表后重新抓取（破坏性，仅手动触发，用于迁移后一次性清理历史脏数据）'
+        type: boolean
+        default: false
 
 jobs:
   crawl-and-update:
@@ -33,6 +38,13 @@ jobs:
 
       - name: 安装依赖
         run: npm ci
+
+      - name: 应用数据库迁移
+        run: npx prisma migrate deploy
+
+      - name: 清空旧职位数据（仅手动 reset=true 时）
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.reset == true }}
+        run: node scripts/reset-jobs.js
 
       - name: 运行职位爬取脚本
         run: npm run crawl:jobs
