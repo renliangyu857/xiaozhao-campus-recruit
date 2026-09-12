@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateQRCode } from "@/lib/wechat-pay";
+import { generateQRCode } from "@/lib/ezfp";
 import { logger } from "@/lib/logger";
 import { PAYMENT_ORDER_EXPIRY_MS } from "@/lib/payment-constants";
 

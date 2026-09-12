@@ -91,10 +91,10 @@ const WEBSITE_DATA: WebSite = {
   },
 };
 
-// VIP产品信息
+// VIP产品信息（2026-09 重构：单一 19.9 永久会员）
 const VIP_PRODUCT_DATA: Product = {
-  name: '校招喵VIP会员',
-  description: '解锁无限校招查询、进度管理、内推码库、笔面试资料等全部高级功能，一站式助你拿下心仪Offer',
+  name: '校招喵永久会员',
+  description: '一次付费，永久解锁无限校招查询、进度管理、内推码库、笔面试资料等全部高级功能',
   brand: ORGANIZATION_DATA,
   image: 'https://xiaozhaomiao.cn/vip-product-image.jpg',
   category: 'Software',
@@ -104,31 +104,11 @@ const VIP_PRODUCT_DATA: Product = {
     offers: [
       {
         '@type': 'Offer',
-        name: '1个月会员',
-        description: '灵活体验，适合短期校招冲刺',
-        price: '9.9',
-        priceCurrency: 'CNY',
-        priceValidUntil: '2026-12-31',
-        itemCondition: 'https://schema.org/NewCondition',
-        availability: 'https://schema.org/InStock',
-      },
-      {
-        '@type': 'Offer',
-        name: '3个月会员',
-        description: '最受欢迎，适合完整校招季',
+        name: '永久会员',
+        description: '一次付费，终身全功能解锁，含全部笔面试资料',
         price: '19.9',
         priceCurrency: 'CNY',
-        priceValidUntil: '2026-12-31',
-        itemCondition: 'https://schema.org/NewCondition',
-        availability: 'https://schema.org/InStock',
-      },
-      {
-        '@type': 'Offer',
-        name: '年度会员',
-        description: '超值之选，涵盖全年校招周期',
-        price: '49.9',
-        priceCurrency: 'CNY',
-        priceValidUntil: '2026-12-31',
+        priceValidUntil: '2099-12-31',
         itemCondition: 'https://schema.org/NewCondition',
         availability: 'https://schema.org/InStock',
       },

@@ -4,7 +4,7 @@ import { getSessionUserId } from "@/lib/session";
 import { logger } from "@/lib/logger";
 import { invalidateAuthCurrentCache } from "@/lib/cache";
 import { finalizeOrderPayment } from "@/lib/payment-order";
-import { queryOrder } from "@/lib/wechat-pay";
+import { queryEzfpOrder } from "@/lib/ezfp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,37 +46,37 @@ export async function GET(
 
     if (order.payStatus === "pending") {
       try {
-        const wxOrder = await queryOrder(orderNo);
+        const ezfpOrder = await queryEzfpOrder(orderNo);
 
-        logger.info("payment_query_wechat_fallback_checked", {
+        logger.info("payment_query_ezfp_fallback_checked", {
           orderNo,
           userId: String(userId),
-          tradeState: wxOrder.tradeState,
+          status: ezfpOrder.status,
         });
 
-        if (wxOrder.tradeState === "SUCCESS") {
+        if (ezfpOrder.status === 1) {
           order = await finalizeOrderPayment({
             orderNo,
-            transactionId: wxOrder.transactionId,
-            successTime: wxOrder.successTime,
-            amountTotal: wxOrder.amount?.total,
+            transactionId: ezfpOrder.tradeNo,
+            successTime: undefined,
+            amountTotal: order.amount,
             notifyResult: JSON.stringify({
               source: "query_order_fallback",
-              tradeState: wxOrder.tradeState,
-              transactionId: wxOrder.transactionId,
-              successTime: wxOrder.successTime,
-              amount: wxOrder.amount,
+              status: ezfpOrder.status,
+              tradeNo: ezfpOrder.tradeNo,
+              outTradeNo: ezfpOrder.outTradeNo,
+              money: ezfpOrder.money,
             }),
             source: "query_fallback",
           });
 
           await invalidateAuthCurrentCache(Number(order.userId));
         }
-      } catch (wechatError) {
-        logger.warn("payment_query_wechat_fallback_failed", {
+      } catch (ezfpError) {
+        logger.warn("payment_query_ezfp_fallback_failed", {
           orderNo,
           userId: String(userId),
-          error: String(wechatError),
+          error: String(ezfpError),
         });
       }
     }

@@ -1,49 +1,28 @@
-import { prisma } from "./prisma";
-
 /**
- * 支付配置 - 商品价格、首月优惠等
+ * 支付配置 - 商品价格
+ * 2026-09 重构：单一商品「19.9 永久会员」，全部功能（含网盘资料）无差别解锁。
  */
 
 export const PRODUCT_CONFIG = {
   vip: {
-    "1_month": {
-      name: "月度会员",
-      getPrice: async (userId: bigint): Promise<number> => {
-        // 检查用户是否购买过VIP
-        const hasPurchased = await prisma.order.findFirst({
-          where: {
-            userId,
-            productType: "vip",
-            payStatus: "paid",
-          },
-        });
-
-        // 首月5.8元，之后9.9元（单位：分）
-        return hasPurchased ? 990 : 580;
-      },
-      originalPrice: 990, // 原价9.9元
-      durationDays: 30,
-    },
-    "3_month": {
-      name: "季度会员",
-      price: 1660, // 16.6元
-      originalPrice: 2970, // 29.7元（原价）
-      durationDays: 90,
-    },
-    "1_year": {
-      name: "年度会员",
-      price: 4990, // 49.9元
-      originalPrice: 11880, // 118.8元（原价）
-      durationDays: 365,
+    lifetime: {
+      name: "永久会员",
+      price: 1990, // 19.9 元（单位：分）
+      originalPrice: 1990,
+      durationDays: 0, // 0 表示永久
     },
   },
   material: {
-    defaultPrice: 660, // 6.6元
+    // 资料已随 19.9 永久会员解锁，不再单独售卖；defaultPrice 仅作历史兼容保留
+    defaultPrice: 660,
   },
 };
 
 export type ProductType = "vip" | "material";
-export type VipPlanId = "1_month" | "3_month" | "1_year";
+export type VipPlanId = "lifetime";
+
+/** 永久会员固定到期时间 */
+export const LIFETIME_END_AT = new Date("2099-12-31T23:59:59.000Z");
 
 /**
  * 获取商品价格（单位：分）
@@ -60,37 +39,19 @@ export async function getProductPrice(
   isFirstMonth?: boolean;
 }> {
   if (productType === "vip") {
-    const planId = productId as VipPlanId;
-    const plan = PRODUCT_CONFIG.vip[planId];
-
+    const plan = PRODUCT_CONFIG.vip[productId as VipPlanId];
     if (!plan) {
       throw new Error("无效的会员套餐");
     }
-
-    // 月度会员可能有首月优惠
-    if (planId === "1_month") {
-      const monthPlan = plan as { name: string; getPrice: (userId: bigint) => Promise<number>; originalPrice: number; durationDays: number };
-      const price = await monthPlan.getPrice(userId);
-      const isFirstMonth = price < monthPlan.originalPrice;
-      return {
-        price,
-        originalPrice: monthPlan.originalPrice,
-        productName: monthPlan.name,
-        isFirstMonth,
-      };
-    }
-
-    // 季度/年度固定价格
-    const fixedPlan = plan as { name: string; price: number; originalPrice: number; durationDays: number };
     return {
-      price: fixedPlan.price,
-      originalPrice: fixedPlan.originalPrice,
-      productName: fixedPlan.name,
+      price: plan.price,
+      originalPrice: plan.originalPrice,
+      productName: plan.name,
+      isFirstMonth: false,
     };
   }
 
   if (productType === "material") {
-    // 资料价格由调用方传入，或使用默认价格
     const price = materialPrice || PRODUCT_CONFIG.material.defaultPrice;
     return {
       price,
@@ -103,30 +64,15 @@ export async function getProductPrice(
 }
 
 /**
- * 计算VIP有效期
+ * 计算 VIP 有效期（永久会员固定到 2099-12-31）
  */
 export function calculateVipValidity(
-  planId: VipPlanId,
+  _planId: VipPlanId,
   currentEndAt?: Date
 ): { startAt: Date; endAt: Date } {
   const now = new Date();
-
-  // 如果有当前有效会员，从结束时间开始顺延
   const startAt = currentEndAt && currentEndAt > now ? new Date(currentEndAt) : now;
-  const endAt = new Date(startAt);
-
-  switch (planId) {
-    case "1_month":
-      endAt.setMonth(endAt.getMonth() + 1);
-      break;
-    case "3_month":
-      endAt.setMonth(endAt.getMonth() + 3);
-      break;
-    case "1_year":
-      endAt.setFullYear(endAt.getFullYear() + 1);
-      break;
-  }
-
+  const endAt = new Date(LIFETIME_END_AT);
   return { startAt, endAt };
 }
 
@@ -147,7 +93,7 @@ export function generateOrderNo(): string {
  */
 export function isValidProduct(productType: ProductType, productId: string): boolean {
   if (productType === "vip") {
-    return ["1_month", "3_month", "1_year"].includes(productId);
+    return productId === "lifetime";
   }
   if (productType === "material") {
     return productId.length > 0;

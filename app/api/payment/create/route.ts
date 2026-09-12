@@ -14,7 +14,7 @@ import {
   PAYMENT_ORDER_EXPIRY_MS,
   getPaymentOrderExpiryTime,
 } from "@/lib/payment-constants";
-import { createNativeOrder } from "@/lib/wechat-pay";
+import { createEzfpOrder } from "@/lib/ezfp";
 
 const ORDER_RATE_WINDOW = 60;
 const ORDER_RATE_MAX = 10;
@@ -70,21 +70,11 @@ export async function POST(request: NextRequest) {
 
   try {
     if (productType === "material") {
-      const existingPurchase = await prisma.panMaterialPurchase.findUnique({
-        where: {
-          userId_materialId: {
-            userId: BigInt(userId),
-            materialId: productId,
-          },
-        },
-      });
-
-      if (existingPurchase?.payStatus === "paid") {
-        return NextResponse.json(
-          { message: "该资料已购买，无需重复下单" },
-          { status: 409 }
-        );
-      }
+      // 资料已随 19.9 永久会员解锁，不再单独售卖
+      return NextResponse.json(
+        { message: "资料已随永久会员（¥19.9）一并解锁，无需单独购买" },
+        { status: 400 }
+      );
     }
 
     // 获取商品价格
@@ -126,7 +116,7 @@ export async function POST(request: NextRequest) {
           productName: existingOrder.productName,
           amount: existingOrder.amount,
           originalAmount: existingOrder.originalAmount,
-          isFirstMonth: productType === "vip" && productId === "1_month" && existingOrder.amount === 10,
+          isFirstMonth: false,
           qrcodeUrl: existingOrder.wxCodeUrl,
           qrcodeImageUrl: `/api/payment/qrcode/${existingOrder.orderNo}`,
           expiryTime: getPaymentOrderExpiryTime(existingOrder.createdAt),
@@ -150,7 +140,7 @@ export async function POST(request: NextRequest) {
       });
 
       const validity = calculateVipValidity(
-        productId as "1_month" | "3_month" | "1_year",
+        "lifetime",
         currentMember?.endAt
       );
       validStartAt = validity.startAt;
@@ -163,39 +153,31 @@ export async function POST(request: NextRequest) {
     // 获取通知URL
     const notifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://your-domain.com"}/api/payment/notify`;
 
-    // 创建微信支付订单
+    // 创建 ezfp 支付订单
     let wxCodeUrl: string;
-    let wxPrepayId: string;
+    let wxTransactionId: string;
 
     try {
-      const wxOrder = await createNativeOrder({
-        description: finalProductName,
+      const ezfpOrder = await createEzfpOrder({
         outTradeNo: orderNo,
-        amount: price,
+        name: finalProductName,
+        moneyYuan: (price / 100).toFixed(2),
         notifyUrl,
-        clientIp: ip,
       });
 
-      wxCodeUrl = wxOrder.codeUrl;
-      wxPrepayId = wxOrder.prepayId;
-    } catch (wxError) {
-      logger.error("payment_create_wx_order_failed", {
+      wxCodeUrl = ezfpOrder.payInfo; // 二维码内容（字符串）
+      wxTransactionId = ezfpOrder.tradeNo;
+    } catch (ezError) {
+      logger.error("payment_create_ezfp_failed", {
         userId: String(userId),
         orderNo,
-        error: String(wxError),
+        error: String(ezError),
       });
 
-      // 如果微信支付配置未设置，使用模拟模式（开发/测试环境）
-      if (process.env.NODE_ENV !== "production") {
-        console.log("[Payment] Using mock mode for development");
-        wxCodeUrl = `weixin://wxpay/bizpayurl?pr=MOCK_${orderNo}`;
-        wxPrepayId = `mock_prepay_${orderNo}`;
-      } else {
-        return NextResponse.json(
-          { message: "创建支付订单失败，请稍后重试" },
-          { status: 500 }
-        );
-      }
+      return NextResponse.json(
+        { message: "创建支付订单失败，请稍后重试" },
+        { status: 500 }
+      );
     }
 
     // 创建订单记录
@@ -210,7 +192,7 @@ export async function POST(request: NextRequest) {
         originalAmount: originalPrice,
         payStatus: "pending",
         wxCodeUrl,
-        wxTransactionId: wxPrepayId, // 临时存储 prepay_id
+        wxTransactionId, // ezfp trade_no
         validStartAt,
         validEndAt,
         clientIp: ip,

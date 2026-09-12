@@ -1,9 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
-import {
-  verifyWechatSignature,
-  decryptNotification,
-} from "@/lib/wechat-pay";
+import { verifyNotifySign, getEzfpConfig } from "@/lib/ezfp";
 import { invalidateAuthCurrentCache } from "@/lib/cache";
 import { finalizeOrderPayment } from "@/lib/payment-order";
 
@@ -11,104 +8,87 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/payment/notify
- * 微信支付结果通知回调
+ * ezfp 异步通知：官方为 GET 回调（参数在 query string），此处同时兼容 POST(form)。
+ * 校验平台公钥签名后，TRADE_SUCCESS 即落库；响应体返回 success 告知网关停止重试。
  */
-export async function POST(request: NextRequest) {
-  const body = await request.text();
 
-  const signature = request.headers.get("Wechatpay-Signature") || "";
-  const timestamp = request.headers.get("Wechatpay-Timestamp") || "";
-  const nonce = request.headers.get("Wechatpay-Nonce") || "";
-  const serial = request.headers.get("Wechatpay-Serial") || "";
+function paramsToRecord(params: URLSearchParams): Record<string, string> {
+  const out: Record<string, string> = {};
+  params.forEach((v, k) => {
+    out[k] = v;
+  });
+  return out;
+}
+
+async function handleNotify(request: NextRequest): Promise<NextResponse> {
+  let params: Record<string, string>;
+
+  if (request.method === "POST") {
+    const text = await request.text();
+    params = paramsToRecord(new URLSearchParams(text));
+  } else {
+    params = paramsToRecord(request.nextUrl.searchParams);
+  }
 
   logger.info("payment_notify_received", {
-    timestamp,
-    nonce,
-    serial,
-    bodyLength: body.length,
+    method: request.method,
+    outTradeNo: params.out_trade_no,
+    tradeStatus: params.trade_status,
+    paramKeys: Object.keys(params),
   });
 
   try {
-    const isValid = verifyWechatSignature(timestamp, nonce, body, signature, serial);
+    const cfg = getEzfpConfig();
+    const isValid = verifyNotifySign(params, cfg.publicKey);
     if (!isValid) {
-      logger.warn("payment_notify_invalid_signature", { timestamp, nonce, serial });
-      return NextResponse.json(
-        { code: "FAIL", message: "Invalid signature" },
-        { status: 401 }
-      );
+      logger.warn("payment_notify_invalid_signature", { outTradeNo: params.out_trade_no });
+      return new NextResponse("fail", { status: 401, headers: { "Content-Type": "text/plain" } });
     }
 
-    const notification = JSON.parse(body);
-    const resource = notification.resource;
-    if (!resource) {
-      logger.warn("payment_notify_no_resource", { notification });
-      return NextResponse.json(
-        { code: "FAIL", message: "No resource" },
-        { status: 400 }
-      );
+    const outTradeNo = params.out_trade_no;
+    const tradeNo = params.trade_no;
+    const tradeStatus = params.trade_status;
+
+    if (!outTradeNo) {
+      return new NextResponse("fail", { status: 400, headers: { "Content-Type": "text/plain" } });
     }
 
-    const decryptedData = decryptNotification(
-      resource.ciphertext,
-      resource.associated_data,
-      resource.nonce
-    );
-
-    const {
-      out_trade_no: outTradeNo,
-      transaction_id: transactionId,
-      trade_state: tradeState,
-      success_time: successTime,
-      amount,
-    } = decryptedData;
-
-    logger.info("payment_notify_decrypted", {
-      outTradeNo,
-      tradeState,
-      transactionId,
-      amountTotal: amount?.total,
-    });
-
-    if (tradeState !== "SUCCESS") {
-      logger.info("payment_notify_not_success", {
-        outTradeNo,
-        tradeState,
+    // 仅 SUCCESS 状态才落库（其它状态如 WAIT_BUYER_PAY / TRADE_CLOSED 忽略）
+    if (tradeStatus === "TRADE_SUCCESS") {
+      const finalizedOrder = await finalizeOrderPayment({
+        orderNo: outTradeNo,
+        transactionId: tradeNo,
+        amountTotal: undefined, // ezfp 回调不含金额，跳过金额校验（以订单记录为准）
+        notifyResult: JSON.stringify(params),
+        source: "notify",
       });
 
-      return NextResponse.json({ code: "SUCCESS", message: "OK" });
+      await invalidateAuthCurrentCache(Number(finalizedOrder.userId));
+
+      logger.info("payment_notify_success", {
+        outTradeNo,
+        tradeNo,
+        userId: String(finalizedOrder.userId),
+        productType: finalizedOrder.productType,
+        payStatus: finalizedOrder.payStatus,
+        bizStatus: finalizedOrder.bizStatus,
+      });
+    } else {
+      logger.info("payment_notify_non_success", { outTradeNo, tradeStatus });
     }
 
-    const finalizedOrder = await finalizeOrderPayment({
-      orderNo: outTradeNo,
-      transactionId,
-      successTime,
-      amountTotal: amount?.total,
-      notifyResult: JSON.stringify(decryptedData),
-      source: "notify",
-    });
-
-    await invalidateAuthCurrentCache(Number(finalizedOrder.userId));
-
-    logger.info("payment_notify_success", {
-      outTradeNo,
-      transactionId,
-      userId: String(finalizedOrder.userId),
-      productType: finalizedOrder.productType,
-      payStatus: finalizedOrder.payStatus,
-      bizStatus: finalizedOrder.bizStatus,
-    });
-
-    return NextResponse.json({ code: "SUCCESS", message: "OK" });
+    // ezfp 期望响应体包含 success 以停止重试
+    return new NextResponse("success", { status: 200, headers: { "Content-Type": "text/plain" } });
   } catch (error) {
-    logger.error("payment_notify_error", {
-      error: String(error),
-      body,
-    });
-
-    return NextResponse.json(
-      { code: "FAIL", message: "Internal error" },
-      { status: 500 }
-    );
+    logger.error("payment_notify_error", { error: String(error), outTradeNo: params.out_trade_no });
+    return new NextResponse("fail", { status: 500, headers: { "Content-Type": "text/plain" } });
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleNotify(request);
+}
+
+export async function POST(request: NextRequest) {
+  return handleNotify(request);
 }

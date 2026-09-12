@@ -2,32 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ExternalLink, Lock, FileText, FileSpreadsheet, Video, X, Sparkles, BookOpen, ShoppingCart } from "lucide-react";
-import type { PanFileItem, PanStats, VipDashboard } from "@/lib/types";
+import { Search, ExternalLink, Lock, FileText, FileSpreadsheet, Video, X, Sparkles, BookOpen } from "lucide-react";
+import type { PanFileItem, PanStats } from "@/lib/types";
 import { PAN_MATERIALS_LIST, PAN_STATS, PAN_FILTER_TAGS } from "@/lib/panMaterials";
 import { loadPanExport } from "@/lib/panExportService";
 import { useUser } from "@/components/UserContext";
-import { getVipDashboard } from "@/lib/vipService";
 import { apiFetch } from "@/lib/apiClient";
-import { createPayment, type CreatePaymentResult } from "@/lib/payment";
-import { PaymentQRCodeModal } from "@/components/PaymentQRCodeModal";
 
 function FileIcon({ format }: { format?: string }) {
   const f = (format || "").toLowerCase();
   if (f === "pdf" || f === "doc" || f === "docx") return <FileText size={18} className="text-[#FF6B4A] shrink-0" />;
   if (f === "mp4" || f === "avi" || f === "mov") return <Video size={18} className="text-[#0D7377] shrink-0" />;
   return <FileSpreadsheet size={18} className="text-slate-400 shrink-0" />;
-}
-
-// 检查用户是否有下载权限（累计有效时长>=3个月）
-function canDownload(vipDashboard: VipDashboard | null): boolean {
-  // 优先使用后端计算的权限字段
-  if (vipDashboard?.canDownloadMaterials !== undefined) {
-    return vipDashboard.canDownloadMaterials;
-  }
-  // 兼容旧逻辑
-  if (!vipDashboard?.isVip) return false;
-  return vipDashboard.planId === "3_month" || vipDashboard.planId === "1_year";
 }
 
 const HIGHLIGHT_KEYS = [
@@ -70,15 +56,9 @@ export default function ExamPage() {
   const [items, setItems] = useState<PanFileItem[]>(PAN_MATERIALS_LIST);
   const [stats, setStats] = useState<PanStats>(PAN_STATS);
   const [loading, setLoading] = useState(true);
-  const [vipDashboard, setVipDashboard] = useState<VipDashboard | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PanFileItem | null>(null);
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
-  const [purchasing, setPurchasing] = useState(false);
-
-  // 微信支付状态
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentData, setPaymentData] = useState<CreatePaymentResult | null>(null);
 
   // 加载用户已购买的资料
   useEffect(() => {
@@ -101,12 +81,6 @@ export default function ExamPage() {
     });
   }, []);
 
-  useEffect(() => {
-    if (user?.isVip) {
-      getVipDashboard().then(setVipDashboard).catch(() => {});
-    }
-  }, [user?.isVip]);
-
   const filtered = useMemo(() => {
     let list = items;
     const k = keyword.trim().toLowerCase();
@@ -127,11 +101,8 @@ export default function ExamPage() {
   const currentPage = Math.min(page, totalPages - 1);
   const pageItems = useMemo(() => filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE), [filtered, currentPage]);
 
-  // 检查是否有下载权限（VIP或单独购买）
-  const hasDownloadAccess = (item: PanFileItem): boolean => {
-    if (canDownload(vipDashboard)) return true;
-    return purchasedIds.has(item.id);
-  };
+  // 检查是否有下载权限：永久会员（pan-materials/check 返回全部资料 ID）或历史单独购买
+  const hasDownloadAccess = (item: PanFileItem): boolean => purchasedIds.has(item.id);
 
   const handleDownload = (item: PanFileItem) => {
     if (!user) {
@@ -144,46 +115,6 @@ export default function ExamPage() {
       return;
     }
     window.open(item.shareUrl, "_blank");
-  };
-
-  // 处理单独购买 - 微信支付流程
-  const handlePurchase = async () => {
-    if (!selectedItem || !user) return;
-    setPurchasing(true);
-    try {
-      // 创建微信支付订单
-      const paymentResult = await createPayment({
-        productType: "material",
-        productId: selectedItem.id,
-        materialId: selectedItem.id,
-        materialName: selectedItem.name,
-        materialPrice: 660, // 6.6元 = 660分
-      });
-
-      // 保存支付数据并显示二维码弹窗
-      setPaymentData(paymentResult);
-      setShowPaywall(false); // 关闭当前弹窗
-      setShowPaymentModal(true); // 显示支付二维码弹窗
-    } catch (error) {
-      console.error("创建支付订单失败:", error);
-      const message = error instanceof Error ? error.message : "创建支付订单失败，请稍后重试";
-      alert(message);
-    } finally {
-      setPurchasing(false);
-    }
-  };
-
-  // 处理支付成功
-  const handlePaymentSuccess = () => {
-    setShowPaymentModal(false);
-
-    // 标记为已购买
-    if (selectedItem) {
-      setPurchasedIds((prev) => new Set([...prev, selectedItem.id]));
-      alert(`购买成功！已解锁「${selectedItem.name}」的下载权限`);
-      // 自动打开下载
-      window.open(selectedItem.shareUrl, "_blank");
-    }
   };
 
   return (
@@ -256,15 +187,15 @@ export default function ExamPage() {
           </div>
         </div>
 
-        {/* VIP下载权限提示 */}
-        {user?.isVip && !canDownload(vipDashboard) && (
+        {/* 永久会员下载权限提示 */}
+        {user && purchasedIds.size === 0 && (
           <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-orange-100 text-sm">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-[#FF6B4A]" />
               <span className="text-slate-700">
-                <span className="font-semibold">季度会员和年度会员</span>可解锁全部资料下载，
+                <span className="font-semibold">永久会员（¥19.9）</span>可无差别解锁全部 {stats.fileCount.toLocaleString()} 份资料下载，
                 <button onClick={() => router.push("/vip")} className="text-[#FF6B4A] hover:underline font-medium ml-1">
-                  去购买 →
+                  去开通 →
                 </button>
               </span>
             </div>
@@ -382,27 +313,16 @@ export default function ExamPage() {
               {selectedItem.name}
             </p>
             <p className="mt-3 text-sm text-slate-500 leading-relaxed">
-              开通季度/年度会员可解锁全部 {stats.fileCount.toLocaleString()} 份资料
+              开通永久会员（¥19.9）即可无差别解锁全部 {stats.fileCount.toLocaleString()} 份资料下载，
               <br />
-              或单独购买当前资料
+              一次付费，终身可用
             </p>
 
-            {/* 单独购买按钮 */}
-            <button
-              onClick={handlePurchase}
-              disabled={purchasing}
-              className="mt-6 w-full rounded-xl bg-gradient-to-r from-[#0D7377] to-[#14919b] py-4 text-sm font-bold text-white hover:shadow-lg hover:shadow-teal-200 transition-all flex items-center justify-center gap-2"
-            >
-              <ShoppingCart size={16} />
-              {purchasing ? "处理中..." : "单独购买 ¥6.6"}
-            </button>
-
-            {/* 购买会员按钮 */}
             <button
               onClick={() => { setShowPaywall(false); router.push("/vip"); }}
-              className="mt-3 w-full rounded-xl bg-gradient-to-r from-[#FF6B4A] to-[#FF8F7A] py-4 text-sm font-bold text-white hover:shadow-lg hover:shadow-orange-200 transition-all"
+              className="mt-6 w-full rounded-xl bg-gradient-to-r from-[#FF6B4A] to-[#FF8F7A] py-4 text-sm font-bold text-white hover:shadow-lg hover:shadow-orange-200 transition-all"
             >
-              升级季度/年度会员
+              开通永久会员 ¥19.9
             </button>
 
             <button onClick={() => setShowPaywall(false)} className="mt-4 text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors">
@@ -410,24 +330,6 @@ export default function ExamPage() {
             </button>
           </div>
         </div>
-      )}
-
-      {/* 微信支付二维码弹窗 */}
-      {paymentData && (
-        <PaymentQRCodeModal
-          isOpen={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          orderNo={paymentData.orderNo}
-          productName={paymentData.productName}
-          amount={paymentData.amount}
-          originalAmount={paymentData.originalAmount}
-          isFirstMonth={paymentData.isFirstMonth}
-          expiryTime={paymentData.expiryTime}
-          onPaymentSuccess={handlePaymentSuccess}
-          onPaymentExpired={() => {
-            // 订单过期，可以在这里添加重新支付的逻辑
-          }}
-        />
       )}
     </div>
   );
