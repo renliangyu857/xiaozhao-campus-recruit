@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
-import { parseWechatXml, getWechatAccessToken } from "@/lib/wechat";
+import { parseWechatXml, getWechatAccessToken, buildWechatReply } from "@/lib/wechat";
 import { markTicketSuccess, markTicketScanned } from "@/lib/wechatTicket";
+import { createLoginCode } from "@/lib/loginCode";
 import { logger } from "@/lib/logger";
 
 // 从环境变量读取微信服务器配置 Token
@@ -159,12 +160,18 @@ export async function POST(request: NextRequest) {
       return new NextResponse("success");
     }
 
-    const { FromUserName: openid, Event, EventKey } = msg;
+    const { FromUserName: openid, ToUserName: mpId, MsgType, Content, Event, EventKey } = msg;
     logger.info("wechat_mp_event_parsed", {
       openid,
+      msgType: MsgType,
       event: Event,
       eventKey: EventKey,
     });
+
+    // 文本消息：验证码登录（用户在公众号发送「登录」→ 被动回复 6 位验证码）
+    if (MsgType === "text" && openid) {
+      return handleTextMessage(openid, mpId, Content || "");
+    }
 
     // 处理关注事件（包括扫码关注）
     console.log("[WechatMP] Processing event:", { Event, EventKey, openid });
@@ -300,5 +307,39 @@ async function handleUserSubscribe(
   } catch (error) {
     console.error("[WechatMP] Error handling subscribe:", error);
     logger.error("mp_subscribe_error", { openid, error: String(error) });
+  }
+}
+
+/**
+ * 处理文本消息：验证码登录
+ * 用户发送含「登录」的消息 → 生成 6 位验证码（绑定 openid，5 分钟一次性）
+ * → 通过被动回复 XML 直接返回验证码（不调用任何微信 API，无需 access_token）
+ */
+async function handleTextMessage(
+  openid: string,
+  mpId: string,
+  content: string
+): Promise<NextResponse> {
+  const xmlHeaders = { "Content-Type": "text/xml" };
+  try {
+    // 宽松匹配：去掉空白与常见标点后包含「登录」即触发（兼容"登录。""登录 "等输入）
+    const normalized = content.replace(/[\s。，,、.．!！?？~～]/g, "");
+    if (normalized.includes("登录")) {
+      const code = await createLoginCode(openid);
+      logger.info("mp_login_code_issued", { openid });
+      const reply = buildWechatReply(
+        openid,
+        mpId,
+        `您的登录验证码是：${code}\n\n5 分钟内有效、一次性使用。请回到网站输入该验证码完成登录。`
+      );
+      return new NextResponse(reply, { headers: xmlHeaders });
+    }
+    // 非登录关键词：回复引导文案
+    const guide = buildWechatReply(openid, mpId, "回复「登录」即可获取网站登录验证码。");
+    return new NextResponse(guide, { headers: xmlHeaders });
+  } catch (error) {
+    logger.error("mp_login_code_failed", { openid, error: String(error) });
+    // 出错仍返回 success，避免微信无限重推
+    return new NextResponse("success");
   }
 }

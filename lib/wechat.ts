@@ -481,6 +481,7 @@ export interface WechatEventMessage {
   FromUserName: string; // 用户的 OpenID
   CreateTime: number;
   MsgType: string;
+  Content?: string; // 文本消息内容（MsgType=text 时存在）
   Event?: string; // subscribe, unsubscribe, SCAN 等
   EventKey?: string; // 场景值，如 qrscene_ticket_xxx
   Ticket?: string; // 二维码的 ticket
@@ -508,6 +509,7 @@ export function parseWechatXml(xml: string): WechatEventMessage | null {
       FromUserName: result.FromUserName || "",
       CreateTime: parseInt(result.CreateTime || "0"),
       MsgType: result.MsgType || "",
+      Content: result.Content,
       Event: result.Event,
       EventKey: result.EventKey,
       Ticket: result.Ticket,
