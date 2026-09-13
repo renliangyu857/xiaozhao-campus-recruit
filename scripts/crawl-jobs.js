@@ -96,6 +96,76 @@ const SCALE_MAP = {
   7: '其他'
 };
 
+// 字段长度限制（与 prisma/schema.prisma 的 Job 模型保持一致）
+const FIELD_LIMITS = {
+  company: 128,
+  industry: 32,
+  recruitType: 32,
+  locations: 512,
+  startDate: 32,
+  endDate: 32,
+  noWrittenTest: 16,
+  roles: 512,
+  announcementLink: 512,
+  applyLink: 512,
+  remark: 1024,
+  batch: 8,
+  salary: 64,
+};
+
+function stringifyField(value, separator = ';') {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => {
+        if (v == null) return '';
+        if (typeof v === 'object') return v.name || v.title || String(v);
+        return String(v);
+      })
+      .filter(Boolean)
+      .join(separator);
+  }
+  if (typeof value === 'object') {
+    return value.name || value.title || JSON.stringify(value);
+  }
+  return String(value);
+}
+
+function truncateJobStrings(job) {
+  const warnings = [];
+  const out = { ...job };
+  for (const [key, max] of Object.entries(FIELD_LIMITS)) {
+    let val = stringifyField(out[key]);
+    if (val.length > max) {
+      warnings.push(`${key}(${val.length}>${max})`);
+      val = val.slice(0, max);
+    }
+    out[key] = val;
+  }
+  return { job: out, warnings };
+}
+
+function sanitizeJobsForDB(jobs) {
+  const allWarnings = new Map();
+  const sanitized = [];
+  for (const j of jobs) {
+    const { job, warnings } = truncateJobStrings(j);
+    if (warnings.length > 0) {
+      const key = warnings.join(',');
+      allWarnings.set(key, (allWarnings.get(key) || 0) + 1);
+    }
+    sanitized.push(job);
+  }
+  if (allWarnings.size > 0) {
+    const summary = Array.from(allWarnings.entries())
+      .map(([fields, count]) => `${fields}: ${count}条`)
+      .join('; ');
+    console.warn(`⚠️  发现字段超长已截断：${summary}`);
+  }
+  return sanitized;
+}
+
 // 辅助函数
 function getBatchName(typeValue) {
   if (!typeValue) return '';
@@ -254,17 +324,17 @@ function transformJobData(job) {
 
     return {
       announcementId: (typeof job.announcement_id === 'number') ? BigInt(job.announcement_id) : null,
-      company: companyName,
+      company: stringifyField(companyName),
       industry: getIndustryNames(job.industry_types),
       recruitType: getClassNames(job.class_types),
       locations: locations,
-      startDate: job.published_at || '',
-      endDate: job.expired_at || null,
+      startDate: stringifyField(job.published_at),
+      endDate: job.expired_at == null ? null : stringifyField(job.expired_at),
       noWrittenTest: getWrittenTestName(job.written_test) === '无笔试' ? 'true' : 'false',
-      roles: job.original_jobs || '',
-      announcementLink: job.link || '',
-      applyLink: job.from_url || '',
-      remark: companyObj.company_intro || '',
+      roles: stringifyField(job.original_jobs, ';'),
+      announcementLink: stringifyField(job.link),
+      applyLink: stringifyField(job.from_url),
+      remark: stringifyField(companyObj.company_intro),
       batch: '', // 新接口无 recruit_type，无法可靠推导秋招/春招/实习，留空（前端仅展示、不用于筛选）
       salary: null,
       createdAt: parseCreatedAt(job.created_at)
@@ -292,18 +362,21 @@ async function saveJobsToDB(jobs) {
     return { inserted: 0, updated: 0 };
   }
 
-  console.log(`💾 正在按 announcementId 写入 ${valid.length} 个职位（新增/更新分离）...`);
+  // 按 Prisma 字段长度限制截断超长字符串，避免 createMany 报 P2000
+  const sanitized = sanitizeJobsForDB(valid);
+
+  console.log(`💾 正在按 announcementId 写入 ${sanitized.length} 个职位（新增/更新分离）...`);
 
   // 一次性查询已存在的 announcementId，分离新增与更新
-  const ids = valid.map(j => j.announcementId);
+  const ids = sanitized.map(j => j.announcementId);
   const existing = await prisma.job.findMany({
     where: { announcementId: { in: ids } },
     select: { announcementId: true }
   });
   const existingSet = new Set(existing.map(j => j.announcementId));
 
-  const toCreate = valid.filter(j => !existingSet.has(j.announcementId));
-  const toUpdate = valid.filter(j => existingSet.has(j.announcementId));
+  const toCreate = sanitized.filter(j => !existingSet.has(j.announcementId));
+  const toUpdate = sanitized.filter(j => existingSet.has(j.announcementId));
 
   let inserted = 0;
   let updated = 0;
@@ -337,7 +410,7 @@ async function saveJobsToDB(jobs) {
     return { inserted, updated };
   } catch (error) {
     console.error('❌ 保存职位数据到数据库失败:', error);
-    return { inserted, updated };
+    throw error;
   }
 }
 
