@@ -264,13 +264,26 @@ function parseCreatedAt(createdAtStr) {
   }
 }
 
+function chunkArray(array, size) {
+  const chunks = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+}
+
 async function fetchJobsFromAPI() {
   console.log('📡 正在从 paperball-edu API 爬取职位数据...');
 
-  try {
+  const ipp = 100;
+  const allJobs = [];
+  let page = 1;
+  let total = null;
+
+  while (true) {
     const payload = {
-      page: 1,
-      ipp: 100,
+      page,
+      ipp,
       industry_types: [],
       city_ids: [],
       class_types: [],
@@ -299,13 +312,25 @@ async function fetchJobsFromAPI() {
       throw new Error(`API 返回结构异常: ${data?.message || '缺少 data.objects'}`);
     }
 
+    if (total === null) {
+      total = data.data.total ?? 0;
+    }
+
     const jobs = data.data.objects;
-    console.log(`✅ API 爬取成功，获取到 ${jobs.length} 个职位（total=${data.data.total ?? '?'})`);
-    return jobs;
-  } catch (error) {
-    // 向上抛出，由 main 统一处理失败退出码（401/鉴权失效/网络错误均视为任务失败，避免静默成功）
-    throw error;
+    if (jobs.length === 0) break;
+
+    allJobs.push(...jobs);
+    console.log(`✅ 第 ${page} 页爬取成功，本页 ${jobs.length} 个，累计 ${allJobs.length} / ${total ?? '?'}`);
+
+    if (jobs.length < ipp || allJobs.length >= total) break;
+
+    page++;
+    // 简单限流，避免对 paperball 接口造成过大压力
+    await new Promise(resolve => setTimeout(resolve, 200));
   }
+
+  console.log(`✅ API 爬取完成，共 ${allJobs.length} 个职位（total=${total ?? '?'})`);
+  return allJobs;
 }
 
 function transformJobData(job) {
@@ -367,13 +392,17 @@ async function saveJobsToDB(jobs) {
 
   console.log(`💾 正在按 announcementId 写入 ${sanitized.length} 个职位（新增/更新分离）...`);
 
-  // 一次性查询已存在的 announcementId，分离新增与更新
+  // 分页查询已存在的 announcementId，避免一次性 IN 几万条导致 Postgres 参数超限
+  const CHUNK_SIZE = 500;
   const ids = sanitized.map(j => j.announcementId);
-  const existing = await prisma.job.findMany({
-    where: { announcementId: { in: ids } },
-    select: { announcementId: true }
-  });
-  const existingSet = new Set(existing.map(j => j.announcementId));
+  const existingSet = new Set();
+  for (const idChunk of chunkArray(ids, CHUNK_SIZE)) {
+    const existingChunk = await prisma.job.findMany({
+      where: { announcementId: { in: idChunk } },
+      select: { announcementId: true }
+    });
+    for (const j of existingChunk) existingSet.add(j.announcementId);
+  }
 
   const toCreate = sanitized.filter(j => !existingSet.has(j.announcementId));
   const toUpdate = sanitized.filter(j => existingSet.has(j.announcementId));
@@ -382,14 +411,19 @@ async function saveJobsToDB(jobs) {
   let updated = 0;
 
   try {
-    // 新增：批量插入（skipDuplicates 兜底同批重复）
+    // 新增：分批批量插入（避免单条 SQL 参数过多）
     if (toCreate.length > 0) {
-      const result = await prisma.job.createMany({
-        data: toCreate,
-        skipDuplicates: true
-      });
-      inserted = result.count;
-      console.log(`📦 新增 ${inserted} 个职位`);
+      let chunkIndex = 0;
+      const chunks = chunkArray(toCreate, CHUNK_SIZE);
+      for (const chunk of chunks) {
+        chunkIndex++;
+        const result = await prisma.job.createMany({
+          data: chunk,
+          skipDuplicates: true
+        });
+        inserted += result.count;
+        console.log(`📦 新增 ${inserted}/${toCreate.length}（第 ${chunkIndex}/${chunks.length} 批）`);
+      }
     }
 
     // 更新：逐条回写（保留 createdAt 首见时间，不覆盖 announcementId）
