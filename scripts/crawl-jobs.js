@@ -264,6 +264,21 @@ function parseCreatedAt(createdAtStr) {
   }
 }
 
+// 计算上海时间(Asia/Shanghai)下的日期字符串 YYYY-MM-DD。
+// 公式对运行时时区无关：GitHub Actions(UTC) 与本地(UTC+8) 均得到正确上海日期。
+function getShanghaiDateStr(d = new Date()) {
+  const sh = new Date(d.getTime() + (8 * 60 + d.getTimezoneOffset()) * 60000);
+  return sh.toISOString().slice(0, 10);
+}
+
+// 从 API 的 created_at 取日期部分 YYYY-MM-DD（兼容 "2026-09-13 09:12:33" 或 ISO）。
+// 无法解析时返回 null（调用方应保守纳入，避免漏抓）。
+function getCreatedDateStr(createdAtStr) {
+  if (!createdAtStr) return null;
+  const m = String(createdAtStr).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(m) ? m : null;
+}
+
 function chunkArray(array, size) {
   const chunks = [];
   for (let i = 0; i < array.length; i += size) {
@@ -272,13 +287,20 @@ function chunkArray(array, size) {
   return chunks;
 }
 
-async function fetchJobsFromAPI() {
-  console.log('📡 正在从 paperball-edu API 爬取职位数据...');
+async function fetchJobsFromAPI(sinceDateStr = null) {
+  if (sinceDateStr) {
+    console.log(`📡 正在从 paperball-edu API 增量爬取（仅发布日期 >= ${sinceDateStr}）...`);
+  } else {
+    console.log('📡 正在从 paperball-edu API 全量爬取职位数据...');
+  }
 
   const ipp = 100;
   const allJobs = [];
   let page = 1;
   let total = null;
+  // 自适应早停：若接口按发布时间倒序（最新的在前面），首页出现"近期簇"后，
+  // 一旦某页整页都早于 cutoff 即可提前结束，日常增量只拉 1~2 页。
+  let sawRecentCluster = false;
 
   while (true) {
     const payload = {
@@ -319,8 +341,27 @@ async function fetchJobsFromAPI() {
     const jobs = data.data.objects;
     if (jobs.length === 0) break;
 
-    allJobs.push(...jobs);
-    console.log(`✅ 第 ${page} 页爬取成功，本页 ${jobs.length} 个，累计 ${allJobs.length} / ${total ?? '?'}`);
+    // 增量过滤：只保留发布日期 >= cutoff 的（created_at 无法解析则保守纳入，避免漏抓）
+    let pageJobs = jobs;
+    if (sinceDateStr) {
+      pageJobs = jobs.filter(j => {
+        const d = getCreatedDateStr(j.created_at);
+        return d === null || d >= sinceDateStr;
+      });
+      const hasRecent = jobs.some(j => {
+        const d = getCreatedDateStr(j.created_at);
+        return d !== null && d >= sinceDateStr;
+      });
+      if (page === 1 && hasRecent) sawRecentCluster = true;
+      // 首页曾出现近期簇（说明最新在前），且当前页整页都早于 cutoff → 后续必更旧，提前结束
+      if (sawRecentCluster && pageJobs.length === 0 && page > 1) {
+        console.log(`⏩ 检测到按发布时间倒序，第 ${page} 页起均早于 ${sinceDateStr}，提前结束分页（累计 ${allJobs.length}）`);
+        break;
+      }
+    }
+
+    allJobs.push(...pageJobs);
+    console.log(`✅ 第 ${page} 页：本页 ${jobs.length} 个，命中增量 ${pageJobs.length} 个，累计 ${allJobs.length} / ${total ?? '?'}`);
 
     if (jobs.length < ipp || allJobs.length >= total) break;
 
@@ -329,7 +370,7 @@ async function fetchJobsFromAPI() {
     await new Promise(resolve => setTimeout(resolve, 200));
   }
 
-  console.log(`✅ API 爬取完成，共 ${allJobs.length} 个职位（total=${total ?? '?'})`);
+  console.log(`✅ API 爬取完成，共 ${allJobs.length} 个职位（total=${total ?? '?'}${sinceDateStr ? `，增量 cutoff=${sinceDateStr}` : ''}）`);
   return allJobs;
 }
 
@@ -521,8 +562,23 @@ async function main() {
   console.log('🚀 开始执行职位爬取任务...');
 
   try {
+    // 模式决策：
+    // - 表为空 / 显式 FULL_BACKFILL=1 → 全量抓取（一次性补齐历史）
+    // - 否则 → 增量：仅抓"昨天至今"(上海时间，留 1 天边界余量)，避免每天重复全量拉取 2w+
+    //   注：GitHub Actions 的 reset=true 会先清空 job 表，清空后 existing=0 自动走全量，无需额外传参。
+    const forceFull = process.env.FULL_BACKFILL === '1';
+    const existing = await prisma.job.count();
+    let sinceDateStr = null;
+    if (!forceFull && existing > 0) {
+      const yesterday = new Date(Date.now() - 86400000);
+      sinceDateStr = getShanghaiDateStr(yesterday);
+      console.log(`🗓️  增量模式：表已有 ${existing} 条，仅抓发布日期 >= ${sinceDateStr} 的新职位`);
+    } else {
+      console.log(`📦 全量模式：表${existing > 0 ? '非空但强制' : '为空'}，抓取所有在招职位`);
+    }
+
     // 步骤 1：从 API 爬取职位数据
-    const rawJobs = await fetchJobsFromAPI();
+    const rawJobs = await fetchJobsFromAPI(sinceDateStr);
     if (rawJobs.length === 0) {
       console.log('📭 未获取到新职位数据，任务结束');
       return;
