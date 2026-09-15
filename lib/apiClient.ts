@@ -24,6 +24,18 @@ function buildApiUrl(path: string): string {
     : `${trimmedBase}/${normalizedPath}`;
 }
 
+export function prepareApiRequest(init?: RequestInit & { json?: unknown }): RequestInit {
+  const headers = new Headers(init?.headers ?? {});
+  let body: BodyInit | undefined = init?.body ?? undefined;
+  let method = init?.method;
+  if (init && "json" in init && init.json !== undefined) {
+    headers.set("Content-Type", "application/json");
+    body = JSON.stringify(init.json);
+    method = method ?? "POST";
+  }
+  return { ...init, method, headers, body };
+}
+
 export class ApiError extends Error {
   status: number;
   body: unknown;
@@ -38,27 +50,17 @@ export async function apiFetch<T>(
   path: string,
   init?: RequestInit & { json?: unknown }
 ): Promise<T> {
-  const headers = new Headers(init?.headers ?? {});
-  let body: BodyInit | undefined = init?.body ?? undefined;
-  if (init && "json" in init && init.json !== undefined) {
-    headers.set("Content-Type", "application/json");
-    body = JSON.stringify(init.json);
-  }
-
+  const request = prepareApiRequest(init);
   const url = buildApiUrl(path);
 
   // 客户端使用签名请求，服务端使用普通 fetch
   const resp = typeof window !== "undefined"
     ? await signedFetch(url, {
-        ...init,
-        headers,
-        body,
+        ...request,
         credentials: "include",
       })
     : await fetch(url, {
-        ...init,
-        headers,
-        body,
+        ...request,
         credentials: "include",
       });
 
