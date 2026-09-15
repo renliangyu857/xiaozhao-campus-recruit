@@ -151,7 +151,8 @@ export async function POST(request: NextRequest) {
     const orderNo = generateOrderNo();
 
     // 获取通知URL
-    const notifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://your-domain.com"}/api/payment/notify`;
+    const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://www.xiaozhaomiao.cn").replace(/\/+$/, "");
+    const notifyUrl = `${appBaseUrl}/api/payment/notify`;
 
     // 创建 ezfp 支付订单
     let wxCodeUrl: string;
@@ -163,6 +164,7 @@ export async function POST(request: NextRequest) {
         name: finalProductName,
         moneyYuan: (price / 100).toFixed(2),
         notifyUrl,
+        clientIp: ip,
       });
 
       wxCodeUrl = ezfpOrder.payInfo; // 二维码内容（字符串）

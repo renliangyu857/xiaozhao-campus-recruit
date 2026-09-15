@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
-import { verifyNotifySign, getEzfpConfig } from "@/lib/ezfp";
+import { verifyNotifySign, getEzfpNotifyConfig } from "@/lib/ezfp";
 import { invalidateAuthCurrentCache } from "@/lib/cache";
 import { finalizeOrderPayment } from "@/lib/payment-order";
 
@@ -38,7 +38,7 @@ async function handleNotify(request: NextRequest): Promise<NextResponse> {
   });
 
   try {
-    const cfg = getEzfpConfig();
+    const cfg = getEzfpNotifyConfig();
     const isValid = verifyNotifySign(params, cfg.publicKey);
     if (!isValid) {
       logger.warn("payment_notify_invalid_signature", { outTradeNo: params.out_trade_no });

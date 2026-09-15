@@ -11,7 +11,7 @@ export const WECHAT_CONFIG = {
   APP_SECRET: process.env.WECHAT_APP_SECRET || "YOUR_APP_SECRET_HERE",
   // 授权回调地址，必须与公众号后台配置的域名一致
   get CALLBACK_URL() {
-    return `${process.env.NEXT_PUBLIC_APP_URL || "https://your-domain.com"}/api/auth/wechat/callback`;
+    return `${(process.env.NEXT_PUBLIC_APP_URL || "https://www.xiaozhaomiao.cn").replace(/\/+$/, "")}/api/auth/wechat/callback`;
   },
 };
 

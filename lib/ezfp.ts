@@ -39,10 +39,9 @@ export function getEzfpConfig(): EzfpConfig {
   const publicKeyRaw = process.env.EZFP_PUBLIC_KEY || "";
   const apiUrl = (process.env.EZFP_API_URL || "https://www.ezfp.cn").replace(/\/+$/, "");
 
-  if (!pid || !privateKeyRaw || !publicKeyRaw) {
-    throw new Error(
-      "ezfp 支付配置缺失：请在环境变量中配置 EZFP_PID / EZFP_PRIVATE_KEY / EZFP_PUBLIC_KEY"
-    );
+  // 创建订单只需要商户 ID 和商户私钥；平台公钥仅用于异步通知验签。
+  if (!pid || !privateKeyRaw) {
+    throw new Error("ezfp 下单配置缺失：请在环境变量中配置 EZFP_PID / EZFP_PRIVATE_KEY");
   }
 
   return {
@@ -51,6 +50,18 @@ export function getEzfpConfig(): EzfpConfig {
     publicKey: toPem(publicKeyRaw, "PUBLIC KEY"),
     apiUrl,
   };
+}
+
+export interface EzfpNotifyConfig {
+  publicKey: string;
+}
+
+export function getEzfpNotifyConfig(): EzfpNotifyConfig {
+  const publicKeyRaw = process.env.EZFP_PUBLIC_KEY || "";
+  if (!publicKeyRaw.trim()) {
+    throw new Error("ezfp 回调验签配置缺失：请在环境变量中配置 EZFP_PUBLIC_KEY");
+  }
+  return { publicKey: toPem(publicKeyRaw, "PUBLIC KEY") };
 }
 
 /** 对参数集生成 SHA256WithRSA 签名（参数值为字符串） */
@@ -86,13 +97,50 @@ export function verifyNotifySign(params: Record<string, string>, publicKey: stri
   }
 }
 
+export function getAppBaseUrl(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL || "https://www.xiaozhaomiao.cn").replace(/\/+$/, "");
+}
+
 export interface EzfpCreateParams {
   outTradeNo: string;
   name: string;
   moneyYuan: string; // 元，2 位小数，如 "19.90"
   notifyUrl: string;
+  clientIp?: string;
   returnUrl?: string;
   type?: string; // 支付方式，默认 wxpay
+}
+
+interface EzfpPayloadOptions {
+  pid: string;
+  timestamp: string;
+}
+
+/** 构造统一下单参数，单独导出便于在不触发真实支付的情况下回归验证。 */
+export function buildEzfpCreatePayload(
+  params: EzfpCreateParams,
+  options: EzfpPayloadOptions
+): Record<string, string> {
+  const payload: Record<string, string> = {
+    pid: options.pid,
+    method: "web",
+    device: "pc",
+    type: params.type || "wxpay",
+    out_trade_no: params.outTradeNo,
+    notify_url: params.notifyUrl,
+    return_url:
+      params.returnUrl ||
+      `${getAppBaseUrl()}/vip?paid=1`,
+    name: params.name,
+    money: params.moneyYuan,
+    timestamp: options.timestamp,
+  };
+
+  if (params.clientIp) {
+    payload.clientip = params.clientIp;
+  }
+
+  return payload;
 }
 
 export interface EzfpCreateResult {
@@ -101,24 +149,23 @@ export interface EzfpCreateResult {
   payType: string;
 }
 
+export function normalizeEzfpCreateResult(data: Record<string, unknown>): EzfpCreateResult {
+  const tradeNo = String(data.trade_no ?? "");
+  const payInfo = String(data.pay_info ?? data.qr_code ?? "");
+  const payType = String(data.pay_type ?? "qrcode");
+
+  if (!tradeNo || !payInfo) {
+    throw new Error("ezfp 创建订单响应缺少 trade_no 或 pay_info");
+  }
+
+  return { tradeNo, payInfo, payType };
+}
+
 export async function createEzfpOrder(params: EzfpCreateParams): Promise<EzfpCreateResult> {
   const cfg = getEzfpConfig();
   const timestamp = Math.floor(Date.now() / 1000).toString();
 
-  const payload: Record<string, string> = {
-    pid: cfg.pid,
-    method: "web",
-    device: "pc",
-    type: params.type || "wxpay",
-    out_trade_no: params.outTradeNo,
-    notify_url: params.notifyUrl,
-    return_url:
-      params.returnUrl ||
-      `${process.env.NEXT_PUBLIC_APP_URL || "https://your-domain.com"}/vip?paid=1`,
-    name: params.name,
-    money: params.moneyYuan,
-    timestamp,
-  };
+  const payload = buildEzfpCreatePayload(params, { pid: cfg.pid, timestamp });
 
   payload.sign = signParams(payload, cfg.privateKey);
   payload.sign_type = "RSA";
@@ -148,11 +195,7 @@ export async function createEzfpOrder(params: EzfpCreateParams): Promise<EzfpCre
     throw new Error(`ezfp 创建订单失败: ${String(data.msg || data.message || text)}`);
   }
 
-  return {
-    tradeNo: String(data.trade_no ?? ""),
-    payInfo: String(data.pay_info ?? data.qr_code ?? ""),
-    payType: String(data.pay_type ?? "qrcode"),
-  };
+  return normalizeEzfpCreateResult(data);
 }
 
 export interface EzfpQueryResult {
