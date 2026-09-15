@@ -493,10 +493,12 @@ export interface WechatEventMessage {
 export function parseWechatXml(xml: string): WechatEventMessage | null {
   try {
     const result: Record<string, string> = {};
-    const regex = /<(\w+)><!\[CDATA\[(.*?)\]\]><\/\w+>|<(\w+)>(.*?)<\/\w+>/g;
+    // 先去掉根节点，避免通用标签正则把整个 <xml>...</xml> 当成一个字段。
+    const body = xml.replace(/^\s*<xml>\s*|\s*<\/xml>\s*$/g, "");
+    const regex = /<(\w+)><!\[CDATA\[(.*?)\]\]><\/\w+>|<(\w+)>([^<]*?)<\/\w+>/g;
     let match;
 
-    while ((match = regex.exec(xml)) !== null) {
+    while ((match = regex.exec(body)) !== null) {
       const key = match[1] || match[3];
       const value = match[2] || match[4];
       if (key) {
