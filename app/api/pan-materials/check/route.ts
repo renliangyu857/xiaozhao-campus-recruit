@@ -2,15 +2,16 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { PAN_MATERIALS_LIST } from "@/lib/panMaterials";
+import { getMemberEntitlement } from "@/lib/member-entitlement";
 
-// 永久会员（endAt>=now 的 userMember）无差别解锁全部资料
-async function checkIsVip(userId: number): Promise<boolean> {
+// 只有永久会员无差别解锁全部资料，体验会员不包含资料下载权益。
+async function checkCanDownloadMaterials(userId: number): Promise<boolean> {
   const now = new Date();
-  const m = await prisma.userMember.findFirst({
+  const membership = await prisma.userMember.findFirst({
     where: { userId, startAt: { lte: now }, endAt: { gte: now } },
     orderBy: { endAt: "desc" },
   });
-  return !!m;
+  return getMemberEntitlement(membership, now).canDownloadMaterials;
 }
 
 export async function GET() {
@@ -19,12 +20,13 @@ export async function GET() {
     return NextResponse.json({ message: "请先登录" }, { status: 401 });
   }
 
-  const isVip = await checkIsVip(userId);
-  if (isVip) {
+  const canDownloadMaterials = await checkCanDownloadMaterials(userId);
+  if (canDownloadMaterials) {
     // 永久会员：返回全部资料 ID，前端据此放开所有下载
     return NextResponse.json({
       purchasedIds: PAN_MATERIALS_LIST.map((m) => m.id),
       isVip: true,
+      canDownloadMaterials: true,
     });
   }
 
@@ -36,5 +38,6 @@ export async function GET() {
   return NextResponse.json({
     purchasedIds: purchases.map((p) => p.materialId),
     isVip: false,
+    canDownloadMaterials: false,
   });
 }

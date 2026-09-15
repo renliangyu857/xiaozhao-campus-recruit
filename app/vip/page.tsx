@@ -46,7 +46,7 @@ const LIFETIME_BENEFITS: { id: string; label: string; note?: string; icon: React
 export default function VIPPage() {
   const { user, setUser } = useUser();
   const [plans, setPlans] = useState<VipPlan[]>([]);
-  const [dashboard, setDashboard] = useState<Pick<VipDashboard, "isTrial" | "referralCodeCount" | "vipExpiry"> | null>(null);
+  const [dashboard, setDashboard] = useState<Pick<VipDashboard, "isTrial" | "referralCodeCount" | "vipExpiry" | "canDownloadMaterials"> | null>(null);
   const [loading, setLoading] = useState(false);
   const [tickerIndex, setTickerIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
@@ -67,7 +67,7 @@ export default function VIPPage() {
 
   useEffect(() => {
     if (!user?.isVip) return;
-    getVipDashboard().then((d) => setDashboard({ isTrial: d.isTrial, referralCodeCount: d.referralCodeCount, vipExpiry: d.vipExpiry })).catch(() => {});
+    getVipDashboard().then((d) => setDashboard({ isTrial: d.isTrial, referralCodeCount: d.referralCodeCount, vipExpiry: d.vipExpiry, canDownloadMaterials: d.canDownloadMaterials })).catch(() => {});
   }, [user?.id, user?.isVip]);
 
   useEffect(() => {
@@ -118,7 +118,7 @@ export default function VIPPage() {
     if (u.isVip) {
       try {
         const d = await getVipDashboard();
-        setDashboard({ isTrial: d.isTrial, referralCodeCount: d.referralCodeCount, vipExpiry: d.vipExpiry });
+        setDashboard({ isTrial: d.isTrial, referralCodeCount: d.referralCodeCount, vipExpiry: d.vipExpiry, canDownloadMaterials: d.canDownloadMaterials });
         expiryDate = d.vipExpiry ?? expiryDate;
       } catch {
         // 忽略仪表盘错误
@@ -182,7 +182,7 @@ export default function VIPPage() {
                 </div>
                 <div className="flex-1">
                   <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
-                    {user.isTrial || dashboard?.isTrial ? "体验会员" : "尊贵的 VIP 会员"}
+                    {user.isTrial || dashboard?.isTrial ? "体验会员" : "永久会员"}
                   </h2>
                   <p className="text-white/80 text-base">
                     会员有效期至：<span className="font-mono font-bold text-white text-lg">{dashboard?.vipExpiry ?? user.vipExpiry ?? "—"}</span>
@@ -237,7 +237,7 @@ export default function VIPPage() {
               disabled={loading}
               className="w-full py-3.5 rounded-xl font-semibold transition-all duration-200 bg-gradient-to-r from-[#FF6B4A] to-[#FF8F7A] text-white shadow-lg shadow-orange-200 hover:shadow-xl hover:shadow-orange-300 hover:-translate-y-0.5"
             >
-              {user?.isVip ? "续费永久会员" : "立即开通"}
+              {user?.isVip && !user?.isTrial ? "再次购买永久会员" : "立即开通"}
             </button>
 
             {/* 权益清单 */}

@@ -51,6 +51,7 @@ export interface User {
   isVip: boolean;
   isTrial?: boolean;
   vipExpiry?: string;
+  canDownloadMaterials?: boolean;
   queryCount: number;
   remainingFreeQueries?: number;
 }

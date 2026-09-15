@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
+import { getMemberEntitlement, selectActiveMember } from "@/lib/member-entitlement";
 
 export async function GET() {
   const userId = await getSessionUserId();
@@ -12,7 +13,7 @@ export async function GET() {
 
   // 查询所有有效会员记录（按开始时间排序）
   const members = await prisma.userMember.findMany({
-    where: { userId, endAt: { gte: now } },
+    where: { userId, startAt: { lte: now }, endAt: { gte: now } },
     orderBy: { startAt: "asc" },
   });
 
@@ -41,17 +42,17 @@ export async function GET() {
         current.endAt > latest.endAt ? current : latest
       )
     : null;
-
-  // 笔面试资料下载权限：累计有效时长 >= 90天（3个月）
-  const canDownloadMaterials = totalDays >= 90;
+  const activeMember = selectActiveMember(members, now);
+  const entitlement = getMemberEntitlement(activeMember, now);
+  const canDownloadMaterials = entitlement.canDownloadMaterials;
 
   const referralCount = await prisma.referralCode.count({ where: { isValid: true } });
 
   return NextResponse.json({
-    isVip: members.length > 0,
-    planId: latestMember?.planId,
-    isTrial: false,
-    vipExpiry: latestMember ? latestMember.endAt.toISOString().slice(0, 10) : undefined,
+    isVip: entitlement.isVip,
+    planId: activeMember?.planId ?? latestMember?.planId,
+    isTrial: entitlement.isTrial,
+    vipExpiry: entitlement.vipExpiry ?? latestMember?.endAt.toISOString().slice(0, 10),
     referralCodeCount: referralCount,
     savedQueryCount: 0,
     totalValidDays: totalDays, // 累计有效天数

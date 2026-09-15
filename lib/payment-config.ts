@@ -68,10 +68,11 @@ export async function getProductPrice(
  */
 export function calculateVipValidity(
   _planId: VipPlanId,
-  currentEndAt?: Date
+  _currentEndAt?: Date,
+  now = new Date()
 ): { startAt: Date; endAt: Date } {
-  const now = new Date();
-  const startAt = currentEndAt && currentEndAt > now ? new Date(currentEndAt) : now;
+  // 永久会员购买后立即生效；不因已有体验会员而延迟到期时间。
+  const startAt = new Date(now);
   const endAt = new Date(LIFETIME_END_AT);
   return { startAt, endAt };
 }

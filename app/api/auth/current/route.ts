@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { cacheGet, cacheSet, authCurrentCacheKey } from "@/lib/cache";
 import { logger } from "@/lib/logger";
+import { getMemberEntitlement } from "@/lib/member-entitlement";
 
 const MAX_FREE_QUERIES = parseInt(process.env.MAX_FREE_QUERIES ?? "3", 10);
 const AUTH_CURRENT_TTL = 45;
@@ -44,11 +45,15 @@ export async function GET() {
     where: { userId, startAt: { lte: now }, endAt: { gte: now } },
     orderBy: { endAt: "desc" },
   });
-  const isVip = !!membership;
-  logger.info("auth_current_membership", { userId: String(userId), isVip, membershipEndAt: membership?.endAt.toISOString() });
-  const vipExpiry = membership ? membership.endAt.toISOString().slice(0, 10) : null;
-  // 判断是否为试用会员：planId 为 trial 或价格小于等于 0
-  const isTrial = membership ? (membership.planId === 'trial' || membership.planId === 'gift') : false;
+  const entitlement = getMemberEntitlement(membership, now);
+  const { isVip, isTrial, vipExpiry } = entitlement;
+  logger.info("auth_current_membership", {
+    userId: String(userId),
+    isVip,
+    isTrial,
+    membershipPlanId: membership?.planId,
+    membershipEndAt: membership?.endAt.toISOString(),
+  });
 
   const today = new Date().toISOString().slice(0, 10);
   const resetAt = user.queryCountResetAt?.toISOString().slice(0, 10);
@@ -61,6 +66,7 @@ export async function GET() {
     isVip,
     isTrial,
     vipExpiry: vipExpiry ?? undefined,
+    canDownloadMaterials: entitlement.canDownloadMaterials,
     queryCount: user.queryCount,
     remainingFreeQueries: isVip ? undefined : remainingFreeQueries,
   };

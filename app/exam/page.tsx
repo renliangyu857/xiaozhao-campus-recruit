@@ -66,10 +66,10 @@ export default function ExamPage() {
       setPurchasedIds(new Set());
       return;
     }
-    apiFetch<{ purchasedIds: string[] }>("/pan-materials/check")
+    apiFetch<{ purchasedIds: string[]; canDownloadMaterials?: boolean }>("/pan-materials/check")
       .then((data) => setPurchasedIds(new Set(data.purchasedIds)))
       .catch(() => {});
-  }, [user?.id]);
+  }, [user?.id, user?.isVip, user?.canDownloadMaterials]);
 
   useEffect(() => {
     loadPanExport().then(({ items: loaded, stats: loadedStats, fromExport }) => {
