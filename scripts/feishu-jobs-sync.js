@@ -136,7 +136,7 @@ function normalizeFeishuRecord(record) {
   const startDate = parseDateValue(fields[FIELD.startDate]);
   const recordId = record.record_id || record.recordId || '';
   const job = {
-    sourceKey: recordId ? `feishu:${recordId}` : '',
+    sourceKey: recordId ? `feishu:${recordId}` : null,
     company: normalizeText(cellToText(fields[FIELD.company])),
     industry: mapIndustry(fields[FIELD.industry]),
     recruitType: mapRecruitType(fields[FIELD.batch], fields[FIELD.recruitType]),
