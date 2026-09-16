@@ -18,6 +18,7 @@
     "xhs:schedule": "dotenv -e .env.local -- node scripts/scheduled-runner.js",
     "crawl:jobs": "node scripts/crawl-jobs.js",
     "sync:feishu-jobs": "node scripts/feishu-jobs-sync.js",
+    "sync:excel-jobs": "node scripts/excel-jobs-sync.js",
     "reset:jobs": "node scripts/reset-jobs.js",
     "postbuild": "next-sitemap"
   },
