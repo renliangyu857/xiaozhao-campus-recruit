@@ -1,0 +1,42 @@
+name: 飞书岗位表同步
+
+on:
+  # 每天北京时间 09:30（UTC 01:30），在主岗位爬取之后执行
+  schedule:
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+    inputs:
+      full_backfill:
+        description: '执行全量回填（首次启用时勾选）'
+        type: boolean
+        default: false
+
+jobs:
+  sync-feishu-jobs:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+      FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+      FEISHU_BASE_TOKEN: ${{ secrets.FEISHU_BASE_TOKEN }}
+      FEISHU_JOBS_TABLE_ID: ${{ secrets.FEISHU_JOBS_TABLE_ID }}
+      FULL_BACKFILL: ${{ github.event_name == 'workflow_dispatch' && inputs.full_backfill == true && '1' || '0' }}
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 应用数据库迁移
+        run: npx prisma migrate deploy
+
+      - name: 同步飞书岗位表
+        run: npm run sync:feishu-jobs

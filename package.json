@@ -17,6 +17,7 @@
     "xhs:generate": "dotenv -e .env.local -- node scripts/daily-xhs-generator.js",
     "xhs:schedule": "dotenv -e .env.local -- node scripts/scheduled-runner.js",
     "crawl:jobs": "node scripts/crawl-jobs.js",
+    "sync:feishu-jobs": "node scripts/feishu-jobs-sync.js",
     "reset:jobs": "node scripts/reset-jobs.js",
     "postbuild": "next-sitemap"
   },
