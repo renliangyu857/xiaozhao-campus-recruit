@@ -564,15 +564,22 @@ async function main() {
   try {
     // 模式决策：
     // - 表为空 / 显式 FULL_BACKFILL=1 → 全量抓取（一次性补齐历史）
+    // - FROM_DATE 已设（GitHub Actions 手动指定）→ 按 from_date 增量（用于补历史断档）
     // - 否则 → 增量：仅抓"昨天至今"(上海时间，留 1 天边界余量)，避免每天重复全量拉取 2w+
     //   注：GitHub Actions 的 reset=true 会先清空 job 表，清空后 existing=0 自动走全量，无需额外传参。
     const forceFull = process.env.FULL_BACKFILL === '1';
+    const fromDate = (process.env.FROM_DATE || '').trim();
     const existing = await prisma.job.count();
     let sinceDateStr = null;
     if (!forceFull && existing > 0) {
-      const yesterday = new Date(Date.now() - 86400000);
-      sinceDateStr = getShanghaiDateStr(yesterday);
-      console.log(`🗓️  增量模式：表已有 ${existing} 条，仅抓发布日期 >= ${sinceDateStr} 的新职位`);
+      if (fromDate && /^\d{4}-\d{2}-\d{2}$/.test(fromDate)) {
+        sinceDateStr = fromDate;
+        console.log(`🗓️  补数据模式：FROM_DATE=${sinceDateStr}（现有 ${existing} 条，按发布日期 >= ${sinceDateStr} 增量）`);
+      } else {
+        const yesterday = new Date(Date.now() - 86400000);
+        sinceDateStr = getShanghaiDateStr(yesterday);
+        console.log(`🗓️  增量模式：表已有 ${existing} 条，仅抓发布日期 >= ${sinceDateStr} 的新职位`);
+      }
     } else {
       console.log(`📦 全量模式：表${existing > 0 ? '非空但强制' : '为空'}，抓取所有在招职位`);
     }
