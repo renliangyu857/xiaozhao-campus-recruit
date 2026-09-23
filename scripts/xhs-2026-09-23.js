@@ -1,200 +1,293 @@
 /**
- * 2026-09-23 小红书图文（仿鲨鲨 6 段公式）
- * 数据源：Prisma 生产库
- * 输出：outputs/xhs/2026-09-23/{01_cover.png, 02_segments.png, 03_data.json, 04_caption.txt}
- * 不发布，不调用任何外部 LLM/图像 API（按凭据安全红线 v0）
- *
- * 鲨鲨公式（memory/2026-09-14）：
- *   ① 情绪钩子（时点+家人们+紧迫）
- *   ② 数字冲击（昨天新开 100+ 家）
- *   ③ 分板块盘点（银行金融→央国企→外企→互联网民企），每家跟一个亮点标签
- *      亮点标签只能从 {noWrittenTest, daysLeft, locations, industry} 派生，禁止薪资福利（salary 23884 全空）
- *   ④ 信息差焦虑
- *   ⑤ 转化钩子（喵一眼校招网申表 / 投递入口 / 内推码）
- *   ⑥ #27届秋招 #秋招信息差
+ * 2026-09-23 小红书图文（仿鲨鲨 6 段公式硬约束）
+ * 产物：outputs/xhs/2026-09-23/{00_cover.png, 01_stats.png, 02..07_company_<n>.png, 99_cta.png}
+ *       + 04_caption.txt / 05_data.json / README.txt
+ * 不发布、不调外部 LLM/图像 API（按凭据安全红线 v0）。
  */
 require("dotenv").config({ path: ".env.production" });
 const fs = require("node:fs");
 const path = require("node:path");
 const { PrismaClient } = require("@prisma/client");
+const { execFileSync } = require("node:child_process");
 
 const prisma = new PrismaClient();
+const PY = process.env.PY_BIN || "/Users/apple/.workbuddy/binaries/python/envs/default/bin/python3.13";
 const OUT = path.resolve(__dirname, "..", "outputs", "xhs", "2026-09-23");
 fs.mkdirSync(OUT, { recursive: true });
 
-// ——————————— ① 取数 ———————————
+// ——— 数据准备 ———
 async function fetchTodayJobs() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const all = await prisma.job.findMany({
+  return prisma.job.findMany({
     where: { createdAt: { gte: today } },
     orderBy: { createdAt: "desc" },
     select: { company: true, industry: true, locations: true, endDate: true, noWrittenTest: true, roles: true },
   });
-  return all;
 }
 
 function daysLeft(endDate) {
   if (!endDate || endDate === "招满为止" || endDate === "招满即止") return null;
   const t = new Date(endDate).getTime();
-  if (Number.isNaN(t)) return null;
-  return Math.max(0, Math.ceil((t - Date.now()) / 86400000));
+  return Number.isNaN(t) ? null : Math.max(0, Math.ceil((t - Date.now()) / 86400000));
 }
 
-// 鲨鲨公式：每家公司只能从 {免笔试/截止天数/城市/板块} 派生亮点
-function buildHighlight(j) {
-  const noTest = j.noWrittenTest === "true";
-  const dl = daysLeft(j.endDate);
-  const locs = (j.locations || "").split(/[,，;；、\s]+/).filter(Boolean);
-  const cityLabel = locs.length > 2 ? `${locs[0]}等${locs.length}地` : (locs[0] || "");
-  if (noTest && dl !== null && dl <= 7) return ["免笔试", `${dl}天后截止`].filter(Boolean).join("·");
-  if (noTest) return "免笔试";
-  if (dl !== null && dl <= 7) return `${dl}天后截止`;
-  if (cityLabel) return `地点${cityLabel}`;
-  return j.industry || "";
+function splitRoles(s) {
+  if (!s) return [];
+  return String(s).split(/[\\,，;；、\/]+/).map((x) => x.trim()).filter(Boolean);
 }
 
-function pickByIndustry(jobs, industries, perIndustry = 1) {
+function splitLocs(s) {
+  if (!s) return [];
+  return String(s).split(/[,，;；、\s]+/).map((x) => x.trim()).filter(Boolean);
+}
+
+function buildTags(j) {
+  const tags = [];
+  if (j.noWrittenTest === "true") tags.push("免笔试");
+  const d = daysLeft(j.endDate);
+  if (d !== null && d <= 60) tags.push(d === 0 ? "今天截止" : `${d} 天后截止`);
+  return tags;
+}
+
+function emojiOf(industry) {
+  // emoji 字体在 macOS+Pillow 下渲染成"口"，改用中文括号替代
+  return ({
+    "金融": "【银行金融】", "国央企": "【国央企】", "外企": "【外企】",
+    "互联网": "【互联网】", "制造业": "【制造业】", "新能源": "【新能源】",
+    "生物医药": "【生物医药】", "消费": "【消费】", "科技": "【科技】",
+    "传媒": "【传媒】", "物流": "【物流】", "专业服务": "【专业服务】", "其他": "【其他】",
+  })[industry] || "【" + industry + "】";
+}
+
+// 鲨鲨板块顺序：金融→国央企→外企→互联网→制造业→生物医药
+const ORDER = ["金融", "国央企", "外企", "互联网", "制造业", "生物医药"];
+
+function pickCompanies(all) {
   const out = [];
-  for (const ind of industries) {
-    const candidates = jobs.filter((j) => j.industry === ind);
-    if (candidates.length === 0) continue;
-    // 排序：免笔试 > 截止最近
-    candidates.sort((a, b) => {
+  for (const ind of ORDER) {
+    const list = all.filter((j) => j.industry === ind);
+    if (!list.length) continue;
+    list.sort((a, b) => {
       const sa = (a.noWrittenTest === "true" ? 100 : 0) + (daysLeft(a.endDate) !== null ? Math.max(0, 100 - daysLeft(a.endDate)) : 0);
       const sb = (b.noWrittenTest === "true" ? 100 : 0) + (daysLeft(b.endDate) !== null ? Math.max(0, 100 - daysLeft(b.endDate)) : 0);
       return sb - sa;
     });
-    out.push(...candidates.slice(0, perIndustry).map((j) => ({ ...j, _highlight: buildHighlight(j) })));
+    out.push({
+      ...list[0],
+      _industry: ind,
+      _tags: buildTags(list[0]),
+      _roles: splitRoles(list[0].roles),
+      _locs: splitLocs(list[0].locations),
+    });
   }
-  return out;
+  return out.slice(0, 6);
 }
 
-// ——————————— ② 文案（鲨鲨 6 段公式） ———————————
-function buildCaption({ total, noTest, byIndustry, topN }) {
+// ——— 文案 ———
+function buildCaption({ total, noTest, byIndustry, picks }) {
   const date = "9月23日";
-  const headline = `${date}，家人们慌了！昨天新开${total}家校招。`;
-  const stats = `📊 今日校招喵新收录 ${total} 条校招公告，其中 ${noTest} 条明确免笔试。`;
-  const sectors = byIndustry.map((b) => `${b.industry}${b._count}家`).join(" / ");
-
-  const segments = [];
-  segments.push(`① 情绪钩子：${headline}秋招竞争激烈，错过只能等春招/社招。\n`);
-  segments.push(`② 数字冲击：${stats}`);
-  segments.push(`板块分布：${sectors}。`);
-  segments.push("");
-  segments.push("③ 分板块盘点（每家跟一个亮点）：");
-  // 按鲨鲨原始顺序：银行/金融 → 央国企 → 外企 → 互联网民企 → 制造业
-  const order = ["金融", "国央企", "外企", "互联网", "制造业", "新能源", "生物医药", "消费", "科技", "传媒", "物流", "专业服务", "其他"];
-  const picks = [];
-  for (const ind of order) {
-    const c = topN.find((j) => j.industry === ind);
-    if (c) picks.push(c);
-  }
-  for (const c of picks.slice(0, 8)) {
-    segments.push(`  ${emoji(c.industry)} ${c.industry} | ${c.company}（${c._highlight || "在招"}）`);
-  }
-  segments.push("");
-  segments.push("④ 信息差焦虑：岗位散在公众号/官网/校招群，自己找必漏；不同公司截止日期、提前批、扩招 HC 全靠自己盯。");
-  segments.push("");
-  segments.push("⑤ 转化钩子：我整理进【校招喵 | 校招网申表】，公司 + 投递入口 + 截止日期一键看，喵一眼小程序直接投。");
-  segments.push("");
-  segments.push("⑥ #27届秋招 #秋招信息差 #校招喵 #应届生 #求职 #内推码");
-  return segments.join("\n");
-}
-
-function emoji(industry) {
-  return ({
-    "金融": "🏦", "国央企": "🚀", "外企": "🌍", "互联网": "💻",
-    "制造业": "🏭", "新能源": "🔋", "生物医药": "🧪", "消费": "🛒",
-    "科技": "⚙️", "传媒": "📺", "物流": "🚚", "专业服务": "📋",
-    "其他": "📦",
-  })[industry] || "📌";
-}
-
-// ——————————— ③ 图片生成（纯 Pillow，不调 API） ———————————
-function generateCover({ date, total, noTest, picks }) {
-  // 用 Node.js 直接生成 SVG → 用 sharp/纯 SVG 文件，或用 Python Pillow
-  // 这里直接落一个 SVG（无外部依赖），再标注 PNG 路径，PNG 留给后续手动导出或 sharp
-  const svg = makeCoverSVG({ date, total, noTest, picks });
-  fs.writeFileSync(path.join(OUT, "01_cover.svg"), svg, "utf8");
-  // 同步写一段说明文件
-  fs.writeFileSync(
-    path.join(OUT, "README.txt"),
-    [
-      "小红书图文（2026-09-23）",
-      "",
-      "封面图源：01_cover.svg（3:4 竖版 1080×1440，可用浏览器直接截图导出 PNG，或用 sharp/Pillow 渲染）",
-      "正文截图：02_segments.txt（段落式，便于切成 4-6 张图文素材）",
-      "数据明细：03_data.json（含 topN 公司清单、亮点、原始文案）",
-      "完整文案：04_caption.txt（直接粘到小红书发布框即可）",
-    ].join("\n"),
-    "utf8",
-  );
-}
-
-function makeCoverSVG({ date, total, noTest, picks }) {
-  const top3 = picks.slice(0, 3);
-  const lines = top3
-    .map((c, i) => `<text x="80" y="${680 + i * 130}" font-size="56" font-weight="700" fill="#FFFFFF" font-family="PingFang SC, sans-serif">${i + 1}. ${escapeXml(c.company)} · ${escapeXml(c._highlight)}</text>`)
-    .join("");
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1440" viewBox="0 0 1080 1440">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FF6B4A"/>
-      <stop offset="100%" stop-color="#E55A3C"/>
-    </linearGradient>
-  </defs>
-  <rect width="1080" height="1440" fill="url(#bg)"/>
-  <rect x="40" y="40" width="1000" height="1360" rx="48" fill="rgba(255,255,255,0.08)"/>
-
-  <text x="80" y="180" font-size="64" font-weight="900" fill="#FFFFFF" font-family="PingFang SC, sans-serif">校招喵 · 每日新增</text>
-  <text x="80" y="280" font-size="56" font-weight="700" fill="#FFFFFF" font-family="PingFang SC, sans-serif">${date}，家人们慌了！</text>
-  <text x="80" y="360" font-size="48" font-weight="600" fill="#FFE3D8" font-family="PingFang SC, sans-serif">昨天校招喵新收录 ${total} 条公告</text>
-  <text x="80" y="430" font-size="48" font-weight="600" fill="#FFE3D8" font-family="PingFang SC, sans-serif">${noTest} 条明确免笔试</text>
-
-  <line x1="80" y1="500" x2="1000" y2="500" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="3"/>
-
-  <text x="80" y="580" font-size="44" font-weight="600" fill="#FFFFFF" font-family="PingFang SC, sans-serif">今日代表企业</text>
-  ${lines}
-
-  <rect x="80" y="1180" width="920" height="180" rx="32" fill="rgba(255,255,255,0.12)"/>
-  <text x="120" y="1250" font-size="44" font-weight="700" fill="#FFFFFF" font-family="PingFang SC, sans-serif">校招喵 | 校招网申表</text>
-  <text x="120" y="1310" font-size="36" font-weight="500" fill="#FFE3D8" font-family="PingFang SC, sans-serif">公司+投递入口+截止日期 · 一键投递</text>
-</svg>`;
-}
-
-function escapeXml(s) {
-  return String(s || "").replace(/[&<>"']/g, (m) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;",
-  })[m]);
-}
-
-// ——————————— ④ 段落式正文（直接粘到小红书） ———————————
-function writeSegmentsText({ total, noTest, byIndustry, topN }) {
-  const segments = [
-    `① 9月23日，家人们慌了！`,
-    ``,
-    `② 昨天校招喵新收录 ${total} 条校招公告，其中 ${noTest} 条免笔试。`,
-    `板块分布：${byIndustry.map((b) => `${b.industry}${b._count}家`).join(" / ")}。`,
-    ``,
+  const lines = [
+    `① ${date}，家人们慌了！昨天新开 ${total} 家校招。秋招竞争激烈，错过只能等春招/社招。`,
+    "",
+    `② 校招喵今天新收录 ${total} 条校招公告，其中 ${noTest} 条明确免笔试。`,
+    `板块分布：${byIndustry.map((b) => `${b.industry} ${b._count} 家`).join(" / ")}。`,
+    "",
     `③ 分板块盘点（每家跟一个亮点）：`,
   ];
-  const order = ["金融", "国央企", "外企", "互联网", "制造业", "新能源", "生物医药", "消费"];
-  for (const ind of order) {
-    const c = topN.find((j) => j.industry === ind);
-    if (c) segments.push(`  ${emoji(c.industry)} ${c.industry} | ${c.company}（${c._highlight || "在招"}）`);
+  for (let i = 0; i < picks.length; i++) {
+    const c = picks[i];
+    const tag = c._tags.length ? `（${c._tags.join(" · ")}）` : "（在招）";
+    lines.push(`  ${i + 1}. ${c.company} ${tag}`);
+    lines.push(`     ${emojiOf(c._industry).slice(1, -1)} | ${c._locs.slice(0, 4).join(" / ")}`);
+    if (c._roles.length) lines.push(`     岗位：${c._roles.slice(0, 5).join(" / ")}`);
   }
-  segments.push("");
-  segments.push(`④ 信息差焦虑：岗位散在公众号/官网/校招群，自己找必漏。`);
-  segments.push("");
-  segments.push(`⑤ 我整理进【校招喵 | 校招网申表】，公司 + 投递入口 + 截止日期一键看，喵一眼小程序直接投。`);
-  segments.push("");
-  segments.push(`#27届秋招 #秋招信息差 #校招喵 #应届生 #求职 #内推码`);
-  return segments.join("\n");
+  lines.push("");
+  lines.push("④ 信息差焦虑：岗位散在公众号/官网/校招群，自己找必漏。");
+  lines.push("");
+  lines.push("⑤ 我整理进【校招喵 | 校招网申表】，公司 + 投递入口 + 截止日期一键看，喵一眼小程序直接投。");
+  lines.push("");
+  lines.push("#27届秋招 #秋招信息差 #校招喵 #应届生 #求职 #内推码");
+  return lines.join("\n");
 }
 
-// ——————————— 主 ———————————
+// ——— 图片渲染（交给 Pillow） ———
+function renderToPython({ cards }) {
+  const payload = JSON.stringify(cards);
+  const py = OUT + "render.py";
+  fs.writeFileSync(py, buildRenderScript(payload), "utf8");
+  execFileSync(PY, [py], { stdio: "inherit" });
+  fs.unlinkSync(py);
+}
+
+function buildRenderScript(cardsJson) {
+  return `#!/usr/bin/env python3
+import json, os
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
+
+CARDS = json.loads(${JSON.stringify(cardsJson)})
+OUT = Path(${JSON.stringify(OUT)})
+
+BG_TOP, BG_BOTTOM = (255, 107, 74), (229, 90, 60)
+DARK_BG = (29, 27, 32)
+ORANGE = (232, 90, 60)
+ORANGE_SOFT = (255, 195, 130)
+WHITE = (255, 255, 255)
+SUBTLE = (255, 227, 216)
+GREY = (180, 180, 185)
+
+def font(size, bold=True):
+    for p in [
+        "/System/Library/Fonts/PingFang.ttc",
+        "/System/Library/Fonts/STHeiti Medium.ttc",
+        "/Library/Fonts/Arial Unicode.ttf",
+    ]:
+        if os.path.exists(p):
+            try:
+                return ImageFont.truetype(p, size)
+            except Exception:
+                continue
+    return ImageFont.load_default()
+
+def fit(draw, text, font, max_w):
+    if not text: return ""
+    lines, cur = [], ""
+    for ch in str(text):
+        if ch == "\\n":
+            lines.append(cur); cur = ""; continue
+        cand = cur + ch
+        try:
+            w = draw.textlength(cand, font=font)
+        except Exception:
+            w = max_w + 1
+        if w <= max_w:
+            cur = cand
+        else:
+            if cur:
+                lines.append(cur)
+            cur = ch
+    if cur: lines.append(cur)
+    return "\\n".join(lines)
+
+def draw_numbered(i, data):
+    W, H = 1080, 1440
+    img = Image.new("RGB", (W, H), DARK_BG)
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((0, 0, W, 280), fill=ORANGE)
+    draw.text((60, 80), f"{i+2} / 9 张", font=font(48), fill=SUBTLE)
+    draw.text((60, 160), data["industry"], font=font(60, True), fill=WHITE)
+    name_y = 340
+    name = fit(draw, data["company"], font(84, True), W - 120)
+    draw.multiline_text((60, name_y), name, font=font(84, True), fill=WHITE, spacing=10)
+    tag_y = 580
+    if data["tags"]:
+        x = 60
+        for tag in data["tags"]:
+            tw = draw.textlength(tag, font=font(36, True)) + 60
+            draw.rounded_rectangle((x, tag_y, x + tw, tag_y + 70), radius=35, fill=ORANGE)
+            draw.text((x + 30, tag_y + 12), tag, font=font(36, True), fill=WHITE)
+            x += tw + 20
+    role_y = 740
+    draw.text((60, role_y), "招聘岗位", font=font(40, True), fill=SUBTLE)
+    role_lines = data["roles"][:6]
+    role_text = "\\n".join(f"• {r}" for r in role_lines) if role_lines else "（以官网为准）"
+    role_text = fit(draw, role_text, font(38), W - 120)
+    draw.multiline_text((60, role_y + 60), role_text, font=font(38), fill=WHITE, spacing=10)
+    role_n = len(role_text.split('\\n')) if role_text else 0
+    loc_y = role_y + 60 + role_n * 50 + 40
+    if loc_y < H - 200:
+        draw.text((60, loc_y), "工作地点", font=font(40, True), fill=SUBTLE)
+        loc_text = " · ".join(data["locations"][:6]) if data["locations"] else "（见官网）"
+        loc_text = fit(draw, loc_text, font(38), W - 120)
+        draw.multiline_text((60, loc_y + 60), loc_text, font=font(38), fill=WHITE, spacing=10)
+    draw.text((60, H - 110), f"{i+2} / 9 张", font=font(36), fill=GREY)
+    draw.text((W - 360, H - 110), "← 滑动看下一家", font=font(36), fill=GREY)
+    img.save(OUT / f"02_company_{i+1}.png", "PNG", optimize=True)
+
+def draw_cover(data):
+    W, H = 1080, 1440
+    img = Image.new("RGB", (W, H), BG_TOP)
+    draw = ImageDraw.Draw(img)
+    for y in range(H):
+        t = y / H
+        r = int(BG_TOP[0] * (1 - t) + BG_BOTTOM[0] * t)
+        g = int(BG_TOP[1] * (1 - t) + BG_BOTTOM[1] * t)
+        b = int(BG_TOP[2] * (1 - t) + BG_BOTTOM[2] * t)
+        draw.line([(0, y), (W, y)], fill=(r, g, b))
+    draw.rounded_rectangle((40, 40, W - 40, H - 40), radius=48, outline=(255, 255, 255, 80), width=4)
+    draw.text((80, 170), "校招喵 · 每日新增", font=font(64, True), fill=WHITE)
+    draw.text((80, 270), f"{data['date']}，家人们慌了！", font=font(56, True), fill=WHITE)
+    draw.text((80, 360), f"昨天校招喵新收录 {data['total']} 条公告", font=font(48), fill=SUBTLE)
+    draw.text((80, 430), f"{data['noTest']} 条明确免笔试", font=font(48), fill=SUBTLE)
+    draw.line((80, 500, W - 80, 500), fill=(255, 255, 255, 130), width=3)
+    draw.text((80, 570), "今天推荐 6 家（按板块）", font=font(48), fill=WHITE)
+    for i, c in enumerate(data["picks"]):
+        y = 670 + i * 100
+        text = f"  {c['industry_emoji']}  {c['company']}"
+        draw.text((80, y), text, font=font(40), fill=WHITE)
+    draw.text((80, H - 130), "1 / 9 张", font=font(36), fill=SUBTLE)
+    draw.text((W - 420, H - 130), "→ 滑动看今天盘点", font=font(36), fill=SUBTLE)
+    img.save(OUT / "00_cover.png", "PNG", optimize=True)
+
+def draw_stats(data):
+    W, H = 1080, 1440
+    img = Image.new("RGB", (W, H), DARK_BG)
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((0, 0, W, 280), fill=ORANGE)
+    draw.text((60, 80), "2 / 9 张", font=font(48), fill=SUBTLE)
+    draw.text((60, 160), "今日新增 · 板块分布", font=font(60, True), fill=WHITE)
+    draw.text((60, 360), str(data["total"]), font=font(160, True), fill=WHITE)
+    draw.text((280, 410), "条新公告", font=font(48), fill=SUBTLE)
+    draw.text((60, 580), str(data["noTest"]), font=font(140, True), fill=ORANGE_SOFT)
+    draw.text((280, 620), "条免笔试", font=font(48), fill=SUBTLE)
+    y = 820
+    draw.text((60, y - 60), "板块分布", font=font(48, True), fill=WHITE)
+    max_count = max(b["_count"] for b in data["byIndustry"])
+    bar_w = W - 140
+    for b in data["byIndustry"][:6]:
+        bw = max(60, int(bar_w * b["_count"] / max_count))
+        draw.rounded_rectangle((60, y, 60 + bw, y + 56), radius=28, fill=ORANGE)
+        draw.text((80, y + 8), f"{b['industry']}  {b['_count']} 家", font=font(32, True), fill=WHITE)
+        y += 76
+    draw.text((60, H - 110), "2 / 9 张", font=font(36), fill=GREY)
+    draw.text((W - 360, H - 110), "→ 滑动看公司", font=font(36), fill=GREY)
+    img.save(OUT / "01_stats.png", "PNG", optimize=True)
+
+def draw_cta():
+    W, H = 1080, 1440
+    img = Image.new("RGB", (W, H), DARK_BG)
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((0, 0, W, 280), fill=ORANGE)
+    draw.text((60, 80), "9 / 9 张", font=font(48), fill=SUBTLE)
+    draw.text((60, 160), "一键投递", font=font(64, True), fill=WHITE)
+    draw.rounded_rectangle((80, 380, W - 80, 880), radius=48, fill=ORANGE)
+    draw.text((120, 440), "校招喵 · 校招网申表", font=font(60, True), fill=WHITE)
+    draw.text((120, 530), "公司 + 投递入口 + 截止日期", font=font(40), fill=SUBTLE)
+    draw.text((120, 590), "一键查看 · 一键投递", font=font(40), fill=SUBTLE)
+    draw.text((120, 690), "内推码 + 笔面试资料", font=font(40), fill=SUBTLE)
+    draw.text((120, 750), "全部一键领取", font=font(40), fill=SUBTLE)
+    draw.text((60, 940), "评论区扣「1」", font=font(56, True), fill=WHITE)
+    draw.text((60, 1020), "领校招喵每日更新网申表", font=font(40), fill=SUBTLE)
+    draw.text((60, 1100), "主页置顶", font=font(56, True), fill=WHITE)
+    draw.text((60, 1180), "看完整校招时间表 + 投递通道", font=font(40), fill=SUBTLE)
+    draw.text((60, H - 110), "9 / 9 张", font=font(36), fill=GREY)
+    img.save(OUT / "99_cta.png", "PNG", optimize=True)
+
+cover = next(c for c in CARDS if c["kind"] == "cover")
+stats = next(c for c in CARDS if c["kind"] == "stats")
+companies = [c for c in CARDS if c["kind"] == "company"]
+cta = next(c for c in CARDS if c["kind"] == "cta")
+
+draw_cover(cover)
+draw_stats(stats)
+for i, c in enumerate(companies):
+    draw_numbered(i, c)
+draw_cta()
+print("OK 9 张图已生成:", OUT)
+`;
+}
+
 (async () => {
   const jobs = await fetchTodayJobs();
   const total = jobs.length;
@@ -205,46 +298,63 @@ function writeSegmentsText({ total, noTest, byIndustry, topN }) {
     .map(([industry, _count]) => ({ industry, _count }))
     .sort((a, b) => b._count - a._count);
 
-  const order = ["金融", "国央企", "外企", "互联网", "制造业", "新能源", "生物医药", "消费"];
-  const topN = pickByIndustry(jobs, order, 1);
-  for (const c of topN) c._highlight = buildHighlight(c);
+  const picks = pickCompanies(jobs);
 
-  const caption = buildCaption({ total, noTest, byIndustry, topN });
-  fs.writeFileSync(path.join(OUT, "04_caption.txt"), caption, "utf8");
+  const cards = [
+    { kind: "cover", date: "9月23日", total, noTest, picks: picks.map((c) => ({ company: c.company, industry_emoji: emojiOf(c._industry) })) },
+    { kind: "stats", total, noTest, byIndustry },
+    ...picks.map((c) => ({ kind: "company", industry: c._industry, industry_emoji: emojiOf(c._industry), company: c.company, tags: c._tags, roles: c._roles, locations: c._locs })),
+    { kind: "cta" },
+  ];
+
+  renderToPython({ cards });
+
+  const fullCaption = buildCaption({ total, noTest, byIndustry, picks });
+  fs.writeFileSync(path.join(OUT, "04_caption.txt"), fullCaption, "utf8");
   fs.writeFileSync(
-    path.join(OUT, "02_segments.txt"),
-    writeSegmentsText({ total, noTest, byIndustry, topN }),
-    "utf8",
-  );
-  fs.writeFileSync(
-    path.join(OUT, "03_data.json"),
+    path.join(OUT, "05_data.json"),
     JSON.stringify(
       {
         date: "2026-09-23",
         total,
         noTest,
         byIndustry,
-        topN: topN.map((c) => ({
+        picks: picks.map((c) => ({
           company: c.company,
-          industry: c.industry,
-          locations: c.locations,
-          endDate: c.endDate,
+          industry: c._industry,
+          locations: c._locs,
+          roles: c._roles,
+          tags: c._tags,
           noWrittenTest: c.noWrittenTest,
-          roles: c.roles,
-          highlight: c._highlight,
+          endDate: c.endDate,
         })),
-        caption,
+        caption: fullCaption,
       },
       null,
       2,
     ),
     "utf8",
   );
-  generateCover({ date: "9月23日", total, noTest, picks: topN });
+  fs.writeFileSync(
+    path.join(OUT, "README.txt"),
+    [
+      "小红书图文（2026-09-23，9 张轮播）",
+      "0  00_cover.png  封面 + 6 家代表预览",
+      "1  01_stats.png  今日新增数据 + 板块分布",
+      "2-7 02_company_1..6.png  每家公司：岗位 + 地点 + 亮点",
+      "8  99_cta.png  转化卡（评论区扣 1 / 主页置顶）",
+      "",
+      "文案：04_caption.txt",
+      "数据：05_data.json",
+      "渲染脚本：scripts/xhs-2026-09-23.js → scripts/xhs-render.py",
+    ].join("\n"),
+    "utf8",
+  );
+
   await prisma.$disconnect();
   console.log("OK →", OUT);
-  console.log(`总 ${total} / 免笔试 ${noTest}`);
-  console.log("代表企业:", topN.map((c) => `${c.industry}:${c.company}`).join(" / "));
+  console.log(`总 ${total} / 免笔试 ${noTest} / 公司卡 ${picks.length} 张`);
+  picks.forEach((c) => console.log(`  - ${c._industry} | ${c.company}（${c._tags.join("·") || "在招"}）`));
 })().catch((e) => {
   console.error(e);
   process.exit(1);
