@@ -85,6 +85,7 @@ export default function VIPPage() {
     if (!plan) return;
 
     setLoading(true);
+    let isAlipayRedirect = false;
     try {
       // 创建支付订单
       const paymentResult = await createPayment({
@@ -92,15 +93,44 @@ export default function VIPPage() {
         productId: planId,
       });
 
-      // 支付宝渠道：直接渲染 form HTML 让浏览器自动跳转到支付宝
+      // 支付宝渠道：渲染隐藏 form 并立即 submit
+      // React dangerouslySetInnerHTML 不执行 <script>；改用 parseRef + native form.submit()
       if (paymentResult.provider === "alipay" && paymentResult.formHtml) {
-        // 移除任何已有的 alipay-form
+        isAlipayRedirect = true;
+        // 1) 解析 formHtml 取出 action + 所有 input name/value
+        const doc = new DOMParser().parseFromString(paymentResult.formHtml, "text/html");
+        const sourceForm = doc.querySelector("form");
+        if (!sourceForm) {
+          throw new Error("支付宝 formHtml 解析失败：未找到 <form>");
+        }
+        const action = sourceForm.getAttribute("action") ?? "";
+        const fields = Array.from(sourceForm.querySelectorAll("input")).map((el) => ({
+          name: el.getAttribute("name") ?? "",
+          value: el.getAttribute("value") ?? "",
+        }));
+
+        // 2) 移除任何已有的 alipay form
         document.getElementById("alipay_submit")?.remove();
-        // 注入新 form（直接 append 到 body 即可自动 submit）
-        const container = document.createElement("div");
-        container.innerHTML = paymentResult.formHtml;
-        document.body.appendChild(container);
-        // 注意：form submit 跳转，JS 停止
+
+        // 3) 创建并填充隐藏 form
+        const form = document.createElement("form");
+        form.id = "alipay_submit";
+        form.method = "POST";
+        form.action = action;
+        form.style.display = "none";
+        for (const f of fields) {
+          if (f.name === "submit_button_submit") continue;
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = f.name;
+          input.value = f.value;
+          form.appendChild(input);
+        }
+        document.body.appendChild(form);
+
+        // 4) 立即 native submit（绕过 React SyntheticEvent 拦截）
+        form.submit();
+        // 注意：浏览器跳转，JS 停止；不需 setLoading(false)
         return;
       }
 
@@ -112,7 +142,10 @@ export default function VIPPage() {
       if (e instanceof ApiError && e.status === 401) alert("请先登录");
       else alert(((e as ApiError)?.body as { message?: string })?.message ?? (e as Error)?.message ?? "创建支付订单失败");
     } finally {
-      setLoading(false);
+      // 支付宝表单已跳转（页面正在切走），不要清 loading 避免按钮文字闪烁
+      if (!isAlipayRedirect) {
+        setLoading(false);
+      }
     }
   };
 
