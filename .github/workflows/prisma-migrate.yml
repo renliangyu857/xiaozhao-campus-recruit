@@ -32,11 +32,44 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      - name: Install PostgreSQL client (psql)
+        # ubuntu-latest 默认有 libpq-bin（psql）但版本可能旧；显式装一次确保可用
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
       - name: Install dependencies
         run: npm ci --no-audit --prefer-offline
 
       - name: Verify Prisma Client is up-to-date with schema
         run: npx prisma generate
+
+      - name: Resolve previous failed migration
+        # 如果之前 `20260924000000_add_alipay_fields` 因为大小写 bug (42P01) 失败，
+        # DB 的 _prisma_migrations 表里会留 failed 记录，prisma migrate deploy 拒绝继续。
+        # 这里自动标记为已应用（前提：DB 实际表上已经有 alipay_form_html + alipay_trade_no 两列
+        # ——
+        # 安全检查：见下方 VerifyColumns 步骤；如果两列不存在，会发出 ERROR 并跳过 resolve。
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          # 1) 检查迁移是否标记为 failed
+          FAILED=$(npx prisma migrate status 2>&1 || true)
+          echo "$FAILED"
+          if echo "$FAILED" | grep -q "20260924000000_add_alipay_fields.*failed"; then
+            echo "Found failed migration 20260924000000_add_alipay_fields, checking if columns exist..."
+            # 2) 用 SQL 检查实际列是否到位
+            HAS_COLS=$(psql "$DATABASE_URL" -tAc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='order' AND column_name IN ('alipay_form_html','alipay_trade_no');")
+            echo "Columns found: $HAS_COLS / 2"
+            if [ "$HAS_COLS" = "2" ]; then
+              echo "Both columns exist. Resolving migration as applied..."
+              npx prisma migrate resolve --applied 20260924000000_add_alipay_fields
+            else
+              echo "ERROR: columns missing in DB. Resolve aborted."
+              echo "请手动: psql \$DATABASE_URL -c \"ALTER TABLE order ADD COLUMN ...\""
+              exit 1
+            fi
+          fi
 
       - name: Apply pending migrations to production database
         env:
@@ -45,14 +78,21 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npx prisma migrate deploy
 
-      - name: Migration summary
-        if: always()
+      - name: Verify columns actually exist
+        if: success()
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           echo "## Migration Result" >> $GITHUB_STEP_SUMMARY
           echo "Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           npx prisma migrate status 2>&1 || true
+          # 强校验：两列必须真的存在
+          MISSING=$(psql "$DATABASE_URL" -tAc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='order' AND column_name IN ('alipay_form_html','alipay_trade_no');")
+          if [ "$MISSING" != "2" ]; then
+            echo "::error::alipay columns missing after migrate deploy"
+            exit 1
+          fi
+          echo "✓ Both alipay_form_html + alipay_trade_no exist"
 
       - name: Notify failure to Feishu
         if: failure()
