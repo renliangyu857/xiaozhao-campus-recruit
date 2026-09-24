@@ -89,3 +89,5 @@ xhs-images/
 __pycache__/
 *.ps1
 *.bat
+.env*
+.env.alipay-test
