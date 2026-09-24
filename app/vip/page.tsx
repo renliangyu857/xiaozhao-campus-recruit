@@ -92,7 +92,19 @@ export default function VIPPage() {
         productId: planId,
       });
 
-      // 保存支付数据并显示二维码弹窗
+      // 支付宝渠道：直接渲染 form HTML 让浏览器自动跳转到支付宝
+      if (paymentResult.provider === "alipay" && paymentResult.formHtml) {
+        // 移除任何已有的 alipay-form
+        document.getElementById("alipay_submit")?.remove();
+        // 注入新 form（直接 append 到 body 即可自动 submit）
+        const container = document.createElement("div");
+        container.innerHTML = paymentResult.formHtml;
+        document.body.appendChild(container);
+        // 注意：form submit 跳转，JS 停止
+        return;
+      }
+
+      // EZFP / 微信支付渠道：显示二维码弹窗
       setPaymentData(paymentResult);
       setPurchasedPlanName(plan.name);
       setShowPaymentModal(true);
@@ -272,8 +284,8 @@ export default function VIPPage() {
         </div>
       </div>
 
-      {/* 微信支付二维码弹窗 */}
-      {paymentData && (
+      {/* 支付弹窗（按 provider 分支：ezfp = 二维码 / alipay = 跳转） */}
+      {paymentData && paymentData.provider !== "alipay" && (
         <PaymentQRCodeModal
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}

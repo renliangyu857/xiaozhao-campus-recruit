@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { getClientIp, rateLimitCheck } from "@/lib/rateLimit";
@@ -15,13 +15,25 @@ import {
   getPaymentOrderExpiryTime,
 } from "@/lib/payment-constants";
 import { createEzfpOrder } from "@/lib/ezfp";
+import { createAlipayOrder } from "@/lib/alipay";
 
 const ORDER_RATE_WINDOW = 60;
 const ORDER_RATE_MAX = 10;
 
 /**
+ * 选择支付渠道：
+ *   - "ezfp"   易支付 V2（默认；二维码扫码）
+ *   - "alipay" 支付宝官方 v3（form HTML 跳转）
+ * 通过 PAYMENT_PROVID 环境变量切换。
+ */
+function getPaymentProvider(): "ezfp" | "alipay" {
+  const v = (process.env.PAYMENT_PROVID || "ezfp").toLowerCase().trim();
+  return v === "alipay" ? "alipay" : "ezfp";
+}
+
+/**
  * POST /api/payment/create
- * 创建支付订单
+ * 创建支付订单（支持 ezfp / alipay 双渠道）
  */
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
@@ -68,6 +80,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "无效的商品" }, { status: 400 });
   }
 
+  const provider = getPaymentProvider();
+
   try {
     if (productType === "material") {
       // 资料已随 19.9 永久会员解锁，不再单独售卖
@@ -103,24 +117,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingOrder) {
-      // 返回已有订单
       logger.info("payment_create_reuse_order", {
         orderNo: existingOrder.orderNo,
         userId: String(userId),
+        provider,
       });
 
+      // 复用已有订单：前端按 payMethod 决定走二维码还是跳转
       return NextResponse.json({
         success: true,
-        data: {
-          orderNo: existingOrder.orderNo,
-          productName: existingOrder.productName,
-          amount: existingOrder.amount,
-          originalAmount: existingOrder.originalAmount,
-          isFirstMonth: false,
-          qrcodeUrl: existingOrder.wxCodeUrl,
-          qrcodeImageUrl: `/api/payment/qrcode/${existingOrder.orderNo}`,
-          expiryTime: getPaymentOrderExpiryTime(existingOrder.createdAt),
-        },
+        data: buildCreateResponseData(existingOrder, provider),
       });
     }
 
@@ -154,35 +160,58 @@ export async function POST(request: NextRequest) {
     const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://www.xiaozhaomiao.cn").replace(/\/+$/, "");
     const notifyUrl = `${appBaseUrl}/api/payment/notify`;
 
-    // 创建 ezfp 支付订单
+    // 创建支付订单（按 provider 路由）
     let wxCodeUrl: string;
     let wxTransactionId: string;
 
-    try {
-      const ezfpOrder = await createEzfpOrder({
-        outTradeNo: orderNo,
-        name: finalProductName,
-        moneyYuan: (price / 100).toFixed(2),
-        notifyUrl,
-        clientIp: ip,
-      });
-
-      wxCodeUrl = ezfpOrder.payInfo; // 二维码内容（字符串）
-      wxTransactionId = ezfpOrder.tradeNo;
-    } catch (ezError) {
-      logger.error("payment_create_ezfp_failed", {
-        userId: String(userId),
-        orderNo,
-        error: String(ezError),
-      });
-
-      return NextResponse.json(
-        { message: "创建支付订单失败，请稍后重试" },
-        { status: 500 }
-      );
+    if (provider === "alipay") {
+      try {
+        const alipayOrder = createAlipayOrder({
+          outTradeNo: orderNo,
+          totalAmount: (price / 100).toFixed(2),
+          subject: finalProductName,
+          timeoutExpress: "30m",
+          notifyUrl,
+        });
+        // 复用字段：form HTML 存在 wxCodeUrl；alipay trade_no 暂未返回（异步通知时记录）
+        wxCodeUrl = alipayOrder.htmlFormSnippet;
+        wxTransactionId = "";
+      } catch (alError) {
+        logger.error("payment_create_alipay_failed", {
+          userId: String(userId),
+          orderNo,
+          error: String(alError),
+        });
+        return NextResponse.json(
+          { message: "创建支付订单失败，请稍后重试" },
+          { status: 500 }
+        );
+      }
+    } else {
+      try {
+        const ezfpOrder = await createEzfpOrder({
+          outTradeNo: orderNo,
+          name: finalProductName,
+          moneyYuan: (price / 100).toFixed(2),
+          notifyUrl,
+          clientIp: ip,
+        });
+        wxCodeUrl = ezfpOrder.payInfo;
+        wxTransactionId = ezfpOrder.tradeNo;
+      } catch (ezError) {
+        logger.error("payment_create_ezfp_failed", {
+          userId: String(userId),
+          orderNo,
+          error: String(ezError),
+        });
+        return NextResponse.json(
+          { message: "创建支付订单失败，请稍后重试" },
+          { status: 500 }
+        );
+      }
     }
 
-    // 创建订单记录
+    // 创建订单记录（payMethod 区分渠道）
     const order = await prisma.order.create({
       data: {
         orderNo,
@@ -193,8 +222,9 @@ export async function POST(request: NextRequest) {
         amount: price,
         originalAmount: originalPrice,
         payStatus: "pending",
+        payMethod: provider,
         wxCodeUrl,
-        wxTransactionId, // ezfp trade_no
+        wxTransactionId,
         validStartAt,
         validEndAt,
         clientIp: ip,
@@ -208,20 +238,12 @@ export async function POST(request: NextRequest) {
       productType,
       productId,
       amount: price,
+      provider,
     });
 
     return NextResponse.json({
       success: true,
-      data: {
-        orderNo: order.orderNo,
-        productName: order.productName,
-        amount: order.amount,
-        originalAmount: order.originalAmount,
-        isFirstMonth,
-        qrcodeUrl: order.wxCodeUrl,
-        qrcodeImageUrl: `/api/payment/qrcode/${order.orderNo}`,
-        expiryTime: getPaymentOrderExpiryTime(order.createdAt),
-      },
+      data: buildCreateResponseData(order, provider, isFirstMonth),
     });
   } catch (error) {
     logger.error("payment_create_error", {
@@ -234,4 +256,37 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * 构造 create 返回数据：依据 provider 字段不同
+ *   - ezfp:   qrcodeUrl + qrcodeImageUrl
+ *   - alipay: formHtml（前端自动跳转）
+ */
+function buildCreateResponseData(
+  order: { orderNo: string; productName: string; amount: number; originalAmount: number | null; wxCodeUrl: string | null; createdAt: Date; payMethod: string | null },
+  provider: "ezfp" | "alipay",
+  isFirstMonth?: boolean
+): Record<string, unknown> {
+  const base = {
+    orderNo: order.orderNo,
+    productName: order.productName,
+    amount: order.amount,
+    originalAmount: order.originalAmount,
+    isFirstMonth: isFirstMonth ?? false,
+    provider, // 新增：告知前端走哪个渠道
+    expiryTime: getPaymentOrderExpiryTime(order.createdAt),
+  };
+
+  if (provider === "alipay") {
+    return {
+      ...base,
+      formHtml: order.wxCodeUrl ?? "", // alipay 的 form HTML 存在 wxCodeUrl
+    };
+  }
+  return {
+    ...base,
+    qrcodeUrl: order.wxCodeUrl,
+    qrcodeImageUrl: `/api/payment/qrcode/${order.orderNo}`,
+  };
 }

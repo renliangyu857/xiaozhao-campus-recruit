@@ -18,8 +18,15 @@ export interface CreatePaymentResult {
   amount: number;
   originalAmount?: number;
   isFirstMonth?: boolean;
-  qrcodeUrl: string;
-  qrcodeImageUrl: string;
+  /** 支付渠道：ezfp（微信扫码）/ alipay（支付宝跳转） */
+  provider?: "ezfp" | "alipay";
+  /** ezfp：二维码内容（字符串） */
+  qrcodeUrl?: string;
+  /** ezfp：二维码图片 URL（前端 <img src>） */
+  qrcodeImageUrl?: string;
+  /** alipay：form HTML（含自动提交 JS） */
+  formHtml?: string;
+  /** 订单过期时间（ms） */
   expiryTime: number;
 }
 
