@@ -163,6 +163,7 @@ export async function POST(request: NextRequest) {
     // 创建支付订单（按 provider 路由）
     let wxCodeUrl: string;
     let wxTransactionId: string;
+    let alipayFormHtml: string | null = null;
 
     if (provider === "alipay") {
       try {
@@ -173,9 +174,10 @@ export async function POST(request: NextRequest) {
           timeoutExpress: "30m",
           notifyUrl,
         });
-        // 复用字段：form HTML 存在 wxCodeUrl；alipay trade_no 暂未返回（异步通知时记录）
-        wxCodeUrl = alipayOrder.htmlFormSnippet;
+        // form HTML 存到 alipay_form_html（Text 字段）；trade_no 在异步通知时再写
+        wxCodeUrl = ""; // 支付宝不走二维码字段
         wxTransactionId = "";
+        alipayFormHtml = alipayOrder.htmlFormSnippet;
       } catch (alError) {
         logger.error("payment_create_alipay_failed", {
           userId: String(userId),
@@ -225,6 +227,7 @@ export async function POST(request: NextRequest) {
         payMethod: provider,
         wxCodeUrl,
         wxTransactionId,
+        alipayFormHtml,
         validStartAt,
         validEndAt,
         clientIp: ip,
@@ -264,7 +267,7 @@ export async function POST(request: NextRequest) {
  *   - alipay: formHtml（前端自动跳转）
  */
 function buildCreateResponseData(
-  order: { orderNo: string; productName: string; amount: number; originalAmount: number | null; wxCodeUrl: string | null; createdAt: Date; payMethod: string | null },
+  order: { orderNo: string; productName: string; amount: number; originalAmount: number | null; wxCodeUrl: string | null; alipayFormHtml: string | null; createdAt: Date; payMethod: string | null },
   provider: "ezfp" | "alipay",
   isFirstMonth?: boolean
 ): Record<string, unknown> {
@@ -274,14 +277,14 @@ function buildCreateResponseData(
     amount: order.amount,
     originalAmount: order.originalAmount,
     isFirstMonth: isFirstMonth ?? false,
-    provider, // 新增：告知前端走哪个渠道
+    provider,
     expiryTime: getPaymentOrderExpiryTime(order.createdAt),
   };
 
   if (provider === "alipay") {
     return {
       ...base,
-      formHtml: order.wxCodeUrl ?? "", // alipay 的 form HTML 存在 wxCodeUrl
+      formHtml: order.alipayFormHtml ?? "",
     };
   }
   return {

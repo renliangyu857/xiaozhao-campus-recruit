@@ -147,6 +147,10 @@ model Order {
   wxCodeUrl     String?   @map("wx_code_url") @db.VarChar(512)
   wxTransactionId String? @map("wx_transaction_id") @db.VarChar(64)
 
+  // 支付宝支付信息（v3 PC 网站支付特有）
+  alipayFormHtml    String? @map("alipay_form_html") @db.Text
+  alipayTradeNo     String? @map("alipay_trade_no") @db.VarChar(64)
+
   // 业务处理状态
   bizStatus     String    @map("biz_status") @db.VarChar(32) @default("pending")
   bizResult     Json?     @map("biz_result")
