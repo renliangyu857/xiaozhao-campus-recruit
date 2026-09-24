@@ -1,0 +1,77 @@
+name: Prisma Migrate Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'prisma/migrations/**'
+      - 'prisma/schema.prisma'
+      - '.github/workflows/prisma-migrate.yml'
+  workflow_dispatch:
+
+# 严格串行：migrate 不能并发跑（多个 push 同时触发会死锁 / 锁冲突）
+concurrency:
+  group: prisma-migrate-deploy
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    # 加 5 分钟消除人工并发；用 5 分钟超时足够
+    timeout-minutes: 10
+    environment: production  # 可选：要求先 review 才能跑（需在 GitHub 设对应 environment）
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --prefer-offline
+
+      - name: Verify Prisma Client is up-to-date with schema
+        run: npx prisma generate
+
+      - name: Apply pending migrations to production database
+        env:
+          # DATABASE_URL 必须在 GitHub Repo → Secrets and variables → Actions 里配置
+          # 与 Vercel Production env 的 DATABASE_URL 完全一致
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx prisma migrate deploy
+
+      - name: Migration summary
+        if: always()
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "## Migration Result" >> $GITHUB_STEP_SUMMARY
+          echo "Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          npx prisma migrate status 2>&1 || true
+
+      - name: Notify failure to Feishu
+        if: failure()
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+        run: |
+          if [ -n "$FEISHU_WEBHOOK_URL" ]; then
+            curl -X POST "$FEISHU_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"msg_type\":\"text\",\"content\":{\"text\":\"⚠️ 校招喵 Prisma 迁移失败\n仓库: ${{ github.repository }}\n分支: ${{ github.ref }}\ncommit: ${{ github.sha }}\n查看: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}}"
+          fi
+
+      - name: Notify success to Feishu
+        if: success()
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+        run: |
+          if [ -n "$FEISHU_WEBHOOK_URL" ]; then
+            curl -X POST "$FEISHU_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"msg_type\":\"text\",\"content\":{\"text\":\"✅ 校招喵 Prisma 迁移成功\ncommit: ${{ github.sha }}\n查看: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}}"
+          fi
