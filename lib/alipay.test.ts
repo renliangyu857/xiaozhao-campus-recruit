@@ -151,3 +151,106 @@ test("createAlipayOrder 返回值含 formHtml + outTradeNo", async () => {
   assert.equal(out.method, "alipay.trade.page.pay");
   assert.match(out.htmlFormSnippet, /document\.forms\.alipay_submit\.submit\(\)/);
 });
+
+test("v3 待签字符串编码：空格变 +（不是 %20），与网关一致", async () => {
+  const { privatePem, publicPem } = generateTestKeyPair();
+  setAlipayEnv(privatePem, publicPem);
+
+  const { buildAlipayCreatePayload, getAlipayConfig } = await import(alipayModulePath);
+  const cfg = getAlipayConfig();
+
+  // 用真实场景：timestamp 含空格（"2026-09-24 07:15:16"）
+  const payload = buildAlipayCreatePayload(
+    {
+      outTradeNo: "ORDER_TEST_ENCODE",
+      totalAmount: "19.90",
+      subject: "永久会员",
+    },
+    cfg
+  );
+
+  // 抠 form 里的 timestamp 值，看是否是字面空格（网关收到后不会编码）
+  const tsMatch = payload.formHtml.match(/name="timestamp"\s+value="([^"]*)"/);
+  assert.ok(tsMatch);
+  const tsInForm = tsMatch![1].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  assert.ok(tsInForm.includes(" "), `form 里的 timestamp 应保留空格字面值（实际: ${tsInForm}）`);
+
+  // 抠 sign 字段，然后**用应用私钥 + 待签字符串独立重算**验证签名一致性
+  const signMatch = payload.formHtml.match(/name="sign"\s+value="([^"]+)"/);
+  assert.ok(signMatch);
+  const signFromHtml = signMatch![1];
+  // 提取所有 input 字段（除 sign）
+  const fieldRegex = /name="([^"]+)"\s+value="((?:[^"\\]|\\.)*)"/g;
+  const params: Record<string, string> = {};
+  let m: RegExpExecArray | null;
+  while ((m = fieldRegex.exec(payload.formHtml)) !== null) {
+    if (m[1] === "sign") continue;
+    params[m[1]] = m[2].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  }
+
+  // **手动重算签名（按 v3 规范）**：encodeURIComponent → %20 变 + → * 变 %2A → %7E 变 ~
+  const signStr = Object.keys(params)
+    .filter((k) => k !== "sign" && params[k] !== "")
+    .sort()
+    .map((k) => {
+      let encoded = encodeURIComponent(params[k]);
+      encoded = encoded.replace(/%20/g, "+");
+      encoded = encoded.replace(/\*/g, "%2A");
+      encoded = encoded.replace(/%7E/g, "~");
+      return `${k}=${encoded}`;
+    })
+    .join("&");
+
+  const verifier = crypto.createVerify("RSA-SHA256");
+  verifier.update(signStr, "utf8");
+  const okVerify = verifier.verify(publicPem, signFromHtml, "base64");
+  assert.equal(okVerify, true, "手动重算签名应匹配 form 里的 sign 字段");
+});
+
+test("v3 待签字符串包含特殊字符 (*、~、空格) 的编码", async () => {
+  const { privatePem, publicPem } = generateTestKeyPair();
+  setAlipayEnv(privatePem, publicPem);
+
+  const { buildAlipayCreatePayload, getAlipayConfig } = await import(alipayModulePath);
+  const cfg = getAlipayConfig();
+
+  // subject 含特殊字符
+  const payload = buildAlipayCreatePayload(
+    {
+      outTradeNo: "ORDER_SPECIAL",
+      totalAmount: "19.90",
+      subject: "校招喵 永久VIP*~test",  // 含空格、星号、波浪号
+    },
+    cfg
+  );
+
+  // 抠 sign + 提取字段
+  const signMatch = payload.formHtml.match(/name="sign"\s+value="([^"]+)"/);
+  assert.ok(signMatch);
+  const signFromHtml = signMatch![1];
+  const fieldRegex = /name="([^"]+)"\s+value="((?:[^"\\]|\\.)*)"/g;
+  const params: Record<string, string> = {};
+  let m: RegExpExecArray | null;
+  while ((m = fieldRegex.exec(payload.formHtml)) !== null) {
+    if (m[1] === "sign") continue;
+    params[m[1]] = m[2].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  }
+
+  // 手动重算
+  const signStr = Object.keys(params)
+    .filter((k) => k !== "sign" && params[k] !== "")
+    .sort()
+    .map((k) => {
+      let encoded = encodeURIComponent(params[k]);
+      encoded = encoded.replace(/%20/g, "+");
+      encoded = encoded.replace(/\*/g, "%2A");
+      encoded = encoded.replace(/%7E/g, "~");
+      return `${k}=${encoded}`;
+    })
+    .join("&");
+
+  const verifier = crypto.createVerify("RSA-SHA256");
+  verifier.update(signStr, "utf8");
+  const okVerify = verifier.verify(publicPem, signFromHtml, "base64");
+  assert.equal(okVerify, true, "特殊字符 encode 后签名应能验签通过");
+});

@@ -106,12 +106,25 @@ export interface AlipayCreateResult {
 
 /** 计算待签名字符串（v3 规范） */
 function buildSignString(params: Record<string, string>): string {
+  // v3 签名规则（与 v2 不同！）：
+  //   - 排除 sign（自己）和空值；sign_type 参与签名
+  //   - 按 ASCII 升序
+  //   - k=URL 编码后的 v
+  //   - encodeURIComponent 后做以下修正：
+  //       * 空格 %20 替换为 + （网关 body 用 application/x-www-form-urlencoded
+  //         解析时 + 等同空格，所以签名里 + 也表示空格）
+  //       * ~/%7E 还原为 ~（有些 v3 实现如此）
+  //       * * 编码为 %2A
+  //   提交到网关时 form input 的 value 是原始 JSON，浏览器自动 URL 编码后
+  //   与我们的待签字符串一致（都把空格当作 +）。
   return Object.keys(params)
     .filter((k) => k !== "sign" && params[k] !== "" && params[k] != null)
     .sort()
     .map((k) => {
-      // v3 要求：value urlencode，且 + 要编码为 %20
-      const encoded = encodeURIComponent(params[k]).replace(/\+/g, "%20");
+      let encoded = encodeURIComponent(params[k]);
+      encoded = encoded.replace(/%20/g, "+");
+      encoded = encoded.replace(/\*/g, "%2A");
+      encoded = encoded.replace(/%7E/g, "~");
       return `${k}=${encoded}`;
     })
     .join("&");
