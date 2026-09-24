@@ -109,20 +109,24 @@ function buildSignString(params: Record<string, string>): string {
   // v3 签名规则（与 v2 不同！）：
   //   - 排除 sign（自己）和空值；sign_type 参与签名
   //   - 按 ASCII 升序
-  //   - k=URL 编码后的 v
-  //   - encodeURIComponent 后做以下修正：
-  //       * 空格 %20 替换为 + （网关 body 用 application/x-www-form-urlencoded
-  //         解析时 + 等同空格，所以签名里 + 也表示空格）
-  //       * ~/%7E 还原为 ~（有些 v3 实现如此）
-  //       * * 编码为 %2A
-  //   提交到网关时 form input 的 value 是原始 JSON，浏览器自动 URL 编码后
-  //   与我们的待签字符串一致（都把空格当作 +）。
+  //   - k=v 的拼接：
+  //       * URL 类型字段（notify_url / return_url）保持原样不编码
+  //         （支付宝网关对完整 URL 字段不编码冒号斜杠；实测对比网关字符串确认）
+  //       * 其它字段做 encodeURIComponent 完整编码
+  //   - form input 提交时浏览器自动做 application/x-www-form-urlencoded 编码，
+  //     网关拿到的 key=value 字符串与我们签名串完全一致（除 sign 外）。
   return Object.keys(params)
     .filter((k) => k !== "sign" && params[k] !== "" && params[k] != null)
     .sort()
     .map((k) => {
-      let encoded = encodeURIComponent(params[k]);
-      encoded = encoded.replace(/%20/g, "+");
+      const v = String(params[k]);
+      if (k === "notify_url" || k === "return_url") {
+        return `${k}=${v}`;
+      }
+      // v3 特殊字符修正：
+      //   * -> %2A（encodeURIComponent 默认不编码 *，v3 强制编码）
+      //   ~ <- %7E（encodeURIComponent 把 ~ 编码成 %7E，v3 要求还原 ~）
+      let encoded = encodeURIComponent(v);
       encoded = encoded.replace(/\*/g, "%2A");
       encoded = encoded.replace(/%7E/g, "~");
       return `${k}=${encoded}`;

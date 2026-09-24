@@ -152,14 +152,13 @@ test("createAlipayOrder 返回值含 formHtml + outTradeNo", async () => {
   assert.match(out.htmlFormSnippet, /document\.forms\.alipay_submit\.submit\(\)/);
 });
 
-test("v3 待签字符串编码：空格变 +（不是 %20），与网关一致", async () => {
+test("v3 待签字符串编码：URL 字段保持原样，其它字段 encodeURIComponent", async () => {
   const { privatePem, publicPem } = generateTestKeyPair();
   setAlipayEnv(privatePem, publicPem);
 
   const { buildAlipayCreatePayload, getAlipayConfig } = await import(alipayModulePath);
   const cfg = getAlipayConfig();
 
-  // 用真实场景：timestamp 含空格（"2026-09-24 07:15:16"）
   const payload = buildAlipayCreatePayload(
     {
       outTradeNo: "ORDER_TEST_ENCODE",
@@ -169,16 +168,25 @@ test("v3 待签字符串编码：空格变 +（不是 %20），与网关一致",
     cfg
   );
 
-  // 抠 form 里的 timestamp 值，看是否是字面空格（网关收到后不会编码）
+  // 抠 form 里的 timestamp 值，应该是字面空格
   const tsMatch = payload.formHtml.match(/name="timestamp"\s+value="([^"]*)"/);
   assert.ok(tsMatch);
   const tsInForm = tsMatch![1].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
   assert.ok(tsInForm.includes(" "), `form 里的 timestamp 应保留空格字面值（实际: ${tsInForm}）`);
 
-  // 抠 sign 字段，然后**用应用私钥 + 待签字符串独立重算**验证签名一致性
+  // 抠 notify_url / return_url，URL 字面字符（: /）应不编码
+  const notifyMatch = payload.formHtml.match(/name="notify_url"\s+value="([^"]*)"/);
+  assert.ok(notifyMatch);
+  const notifyInForm = notifyMatch![1].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  assert.ok(notifyInForm.startsWith("https://"), `notify_url 应保持 https:// 字面值（实际: ${notifyInForm}）`);
+  assert.ok(!notifyInForm.includes("%3A"), `notify_url 不应编码冒号（实际: ${notifyInForm}）`);
+  assert.ok(!notifyInForm.includes("%2F"), `notify_url 不应编码斜杠（实际: ${notifyInForm}）`);
+
+  // 抠 sign 字段，**用应用公钥独立重算**验证签名一致性
   const signMatch = payload.formHtml.match(/name="sign"\s+value="([^"]+)"/);
   assert.ok(signMatch);
   const signFromHtml = signMatch![1];
+
   // 提取所有 input 字段（除 sign）
   const fieldRegex = /name="([^"]+)"\s+value="((?:[^"\\]|\\.)*)"/g;
   const params: Record<string, string> = {};
@@ -188,16 +196,16 @@ test("v3 待签字符串编码：空格变 +（不是 %20），与网关一致",
     params[m[1]] = m[2].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
   }
 
-  // **手动重算签名（按 v3 规范）**：encodeURIComponent → %20 变 + → * 变 %2A → %7E 变 ~
+  // 手动重算签名（按 v3 规范：URL 字段保持原样）
   const signStr = Object.keys(params)
     .filter((k) => k !== "sign" && params[k] !== "")
     .sort()
     .map((k) => {
-      let encoded = encodeURIComponent(params[k]);
-      encoded = encoded.replace(/%20/g, "+");
-      encoded = encoded.replace(/\*/g, "%2A");
-      encoded = encoded.replace(/%7E/g, "~");
-      return `${k}=${encoded}`;
+      const v = String(params[k]);
+      if (k === "notify_url" || k === "return_url") {
+        return `${k}=${v}`;
+      }
+      return `${k}=${encodeURIComponent(v)}`;
     })
     .join("&");
 
@@ -236,13 +244,15 @@ test("v3 待签字符串包含特殊字符 (*、~、空格) 的编码", async ()
     params[m[1]] = m[2].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
   }
 
-  // 手动重算
+  // 手动重算（按当前代码 v3 算法：URL 字段保持原样，其它字段 encodeURIComponent，
+//                 * 强制编码为 %2A，%7E 还原为 ~）
   const signStr = Object.keys(params)
     .filter((k) => k !== "sign" && params[k] !== "")
     .sort()
     .map((k) => {
-      let encoded = encodeURIComponent(params[k]);
-      encoded = encoded.replace(/%20/g, "+");
+      const v = String(params[k]);
+      if (k === "notify_url" || k === "return_url") return `${k}=${v}`;
+      let encoded = encodeURIComponent(v);
       encoded = encoded.replace(/\*/g, "%2A");
       encoded = encoded.replace(/%7E/g, "~");
       return `${k}=${encoded}`;
