@@ -152,7 +152,7 @@ test("createAlipayOrder 返回值含 formHtml + outTradeNo", async () => {
   assert.match(out.htmlFormSnippet, /document\.forms\.alipay_submit\.submit\(\)/);
 });
 
-test("v3 待签字符串：全部 encodeURIComponent，+→%20，*→%2A，%7E→~（与支付宝 CLI 工具一致）", async () => {
+test("v3 待签字符串：key=value 不编码（与官方 alipay-sdk-nodejs-all 源码一致）", async () => {
   const { privatePem, publicPem } = generateTestKeyPair();
   setAlipayEnv(privatePem, publicPem);
 
@@ -180,18 +180,11 @@ test("v3 待签字符串：全部 encodeURIComponent，+→%20，*→%2A，%7E�
     params[m[1]] = m[2].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
   }
 
-  // 手动重算（按支付宝 CLI 工具算法：全部 encodeURIComponent，
-  //                 + → %20，* → %2A，%7E → ~）
+  // 手动重算（按官方 alipay-sdk-nodejs-all：直接拼接，不编码）
   const signStr = Object.keys(params)
     .filter((k) => k !== "sign" && params[k] !== "")
     .sort()
-    .map((k) => {
-      let encoded = encodeURIComponent(params[k]);
-      encoded = encoded.replace(/\+/g, "%20");
-      encoded = encoded.replace(/\*/g, "%2A");
-      encoded = encoded.replace(/%7E/g, "~");
-      return `${k}=${encoded}`;
-    })
+    .map((k) => `${k}=${params[k]}`)
     .join("&");
 
   const verifier = crypto.createVerify("RSA-SHA256");
@@ -199,8 +192,10 @@ test("v3 待签字符串：全部 encodeURIComponent，+→%20，*→%2A，%7E�
   const okVerify = verifier.verify(publicPem, signFromHtml, "base64");
   assert.equal(okVerify, true, "手动重算签名应匹配 form 里的 sign 字段");
 
-  // 关键断言：notify_url 必须编码（冒号 %3A、斜杠 %2F）
-  assert.match(signStr, /notify_url=https%3A%2F%2F/, "notify_url 必须做完整 URL 编码");
+  // 关键断言：notify_url 保持字面值（按官方 SDK 源码）
+  assert.match(signStr, /notify_url=https:\/\//, "notify_url 应保持字面值，不做 URL 编码");
+  // biz_content 含 JSON 原貌（不编码）
+  assert.match(signStr, /biz_content=\{/, "biz_content 应为 JSON 字面值（不编码）");
 });
 
 test("v3 待签字符串包含特殊字符 (*、~、空格) 的编码", async () => {
@@ -230,21 +225,15 @@ test("v3 待签字符串包含特殊字符 (*、~、空格) 的编码", async ()
     params[m[1]] = m[2].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
   }
 
-  // 手动重算（与支付宝 CLI 工具一致）
+  // 手动重算（按官方 alipay-sdk-nodejs-all：直接拼接，不编码）
   const signStr = Object.keys(params)
     .filter((k) => k !== "sign" && params[k] !== "")
     .sort()
-    .map((k) => {
-      let encoded = encodeURIComponent(params[k]);
-      encoded = encoded.replace(/\+/g, "%20");
-      encoded = encoded.replace(/\*/g, "%2A");
-      encoded = encoded.replace(/%7E/g, "~");
-      return `${k}=${encoded}`;
-    })
+    .map((k) => `${k}=${params[k]}`)
     .join("&");
 
   const verifier = crypto.createVerify("RSA-SHA256");
   verifier.update(signStr, "utf8");
   const okVerify = verifier.verify(publicPem, signFromHtml, "base64");
-  assert.equal(okVerify, true, "特殊字符 encode 后签名应能验签通过");
+  assert.equal(okVerify, true, "特殊字符应能验签通过（不编码）");
 });

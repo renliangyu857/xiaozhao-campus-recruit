@@ -104,29 +104,28 @@ export interface AlipayCreateResult {
   method: string;
 }
 
-/** 计算待签名字符串（v3 规范） */
+/** 计算待签名字符串（v3 规范 · 严格按官方 alipay-sdk-nodejs-all 源码） */
 function buildSignString(params: Record<string, string>): string {
-  // v3 签名规则（按支付宝官方 alipay-cli-tools 实现）：
-  //   - 排除 sign（自己）和空值；sign_type 参与签名
-  //   - 按 ASCII 升序
-  //   - 所有 value（包括 URL 字段）做 encodeURIComponent 完整编码
-  //     * notify_url=https%3A%2F%2F... → 编码后与 form body URL-encoded 一致
-  //   - 编码修正：
-  //     * `+` → %20（空格在 body 解析为 ` ` 但 urlencoding 把 ` ` 编为 `+`，
-  //                 网关 body 把 `+` 解为 ` `，签名里也应该是 `%20` 保持一致）
-  //     * `*` → %2A
-  //     * `%7E` → `~`
-  //   - form input 提交时浏览器自动 application/x-www-form-urlencoded 编码，
-  //     网关拿到的 key=value 字符串与我们签名串完全一致（除 sign 外）。
+  // 官方 SDK (alipay/alipay-sdk-nodejs-all) src/util.ts:117-126 行：
+  //   const signString = Object.keys(params).sort()
+  //     .map(key => {
+  //       let data = params[key];
+  //       if (typeof data !== 'string') data = JSON.stringify(data);
+  //       return `${key}=${data}`;  // ← 关键：直接拼接，不做 URL 编码
+  //     })
+  //     .join('&');
+  //
+  // 也就是说 v3 算法：
+  //   1. 按 key ASCII 升序排序
+  //   2. 每个 key=value 不做 URL 编码（JSON 等特殊字符原样保留）
+  //   3. 排除 sign 字段自身
   return Object.keys(params)
     .filter((k) => k !== "sign" && params[k] !== "" && params[k] != null)
     .sort()
     .map((k) => {
-      let encoded = encodeURIComponent(params[k]);
-      encoded = encoded.replace(/\+/g, "%20");
-      encoded = encoded.replace(/\*/g, "%2A");
-      encoded = encoded.replace(/%7E/g, "~");
-      return `${k}=${encoded}`;
+      let data: unknown = params[k];
+      if (typeof data !== "string") data = JSON.stringify(data);
+      return `${k}=${data}`;
     })
     .join("&");
 }
