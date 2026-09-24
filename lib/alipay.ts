@@ -106,27 +106,24 @@ export interface AlipayCreateResult {
 
 /** 计算待签名字符串（v3 规范） */
 function buildSignString(params: Record<string, string>): string {
-  // v3 签名规则（与 v2 不同！）：
+  // v3 签名规则（按支付宝官方 alipay-cli-tools 实现）：
   //   - 排除 sign（自己）和空值；sign_type 参与签名
   //   - 按 ASCII 升序
-  //   - k=v 的拼接：
-  //       * URL 类型字段（notify_url / return_url）保持原样不编码
-  //         （支付宝网关对完整 URL 字段不编码冒号斜杠；实测对比网关字符串确认）
-  //       * 其它字段做 encodeURIComponent 完整编码
-  //   - form input 提交时浏览器自动做 application/x-www-form-urlencoded 编码，
+  //   - 所有 value（包括 URL 字段）做 encodeURIComponent 完整编码
+  //     * notify_url=https%3A%2F%2F... → 编码后与 form body URL-encoded 一致
+  //   - 编码修正：
+  //     * `+` → %20（空格在 body 解析为 ` ` 但 urlencoding 把 ` ` 编为 `+`，
+  //                 网关 body 把 `+` 解为 ` `，签名里也应该是 `%20` 保持一致）
+  //     * `*` → %2A
+  //     * `%7E` → `~`
+  //   - form input 提交时浏览器自动 application/x-www-form-urlencoded 编码，
   //     网关拿到的 key=value 字符串与我们签名串完全一致（除 sign 外）。
   return Object.keys(params)
     .filter((k) => k !== "sign" && params[k] !== "" && params[k] != null)
     .sort()
     .map((k) => {
-      const v = String(params[k]);
-      if (k === "notify_url" || k === "return_url") {
-        return `${k}=${v}`;
-      }
-      // v3 特殊字符修正：
-      //   * -> %2A（encodeURIComponent 默认不编码 *，v3 强制编码）
-      //   ~ <- %7E（encodeURIComponent 把 ~ 编码成 %7E，v3 要求还原 ~）
-      let encoded = encodeURIComponent(v);
+      let encoded = encodeURIComponent(params[k]);
+      encoded = encoded.replace(/\+/g, "%20");
       encoded = encoded.replace(/\*/g, "%2A");
       encoded = encoded.replace(/%7E/g, "~");
       return `${k}=${encoded}`;

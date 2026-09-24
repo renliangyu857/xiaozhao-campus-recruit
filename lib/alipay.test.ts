@@ -152,7 +152,7 @@ test("createAlipayOrder 返回值含 formHtml + outTradeNo", async () => {
   assert.match(out.htmlFormSnippet, /document\.forms\.alipay_submit\.submit\(\)/);
 });
 
-test("v3 待签字符串编码：URL 字段保持原样，其它字段 encodeURIComponent", async () => {
+test("v3 待签字符串：全部 encodeURIComponent，+→%20，*→%2A，%7E→~（与支付宝 CLI 工具一致）", async () => {
   const { privatePem, publicPem } = generateTestKeyPair();
   setAlipayEnv(privatePem, publicPem);
 
@@ -164,70 +164,6 @@ test("v3 待签字符串编码：URL 字段保持原样，其它字段 encodeURI
       outTradeNo: "ORDER_TEST_ENCODE",
       totalAmount: "19.90",
       subject: "永久会员",
-    },
-    cfg
-  );
-
-  // 抠 form 里的 timestamp 值，应该是字面空格
-  const tsMatch = payload.formHtml.match(/name="timestamp"\s+value="([^"]*)"/);
-  assert.ok(tsMatch);
-  const tsInForm = tsMatch![1].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
-  assert.ok(tsInForm.includes(" "), `form 里的 timestamp 应保留空格字面值（实际: ${tsInForm}）`);
-
-  // 抠 notify_url / return_url，URL 字面字符（: /）应不编码
-  const notifyMatch = payload.formHtml.match(/name="notify_url"\s+value="([^"]*)"/);
-  assert.ok(notifyMatch);
-  const notifyInForm = notifyMatch![1].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
-  assert.ok(notifyInForm.startsWith("https://"), `notify_url 应保持 https:// 字面值（实际: ${notifyInForm}）`);
-  assert.ok(!notifyInForm.includes("%3A"), `notify_url 不应编码冒号（实际: ${notifyInForm}）`);
-  assert.ok(!notifyInForm.includes("%2F"), `notify_url 不应编码斜杠（实际: ${notifyInForm}）`);
-
-  // 抠 sign 字段，**用应用公钥独立重算**验证签名一致性
-  const signMatch = payload.formHtml.match(/name="sign"\s+value="([^"]+)"/);
-  assert.ok(signMatch);
-  const signFromHtml = signMatch![1];
-
-  // 提取所有 input 字段（除 sign）
-  const fieldRegex = /name="([^"]+)"\s+value="((?:[^"\\]|\\.)*)"/g;
-  const params: Record<string, string> = {};
-  let m: RegExpExecArray | null;
-  while ((m = fieldRegex.exec(payload.formHtml)) !== null) {
-    if (m[1] === "sign") continue;
-    params[m[1]] = m[2].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
-  }
-
-  // 手动重算签名（按 v3 规范：URL 字段保持原样）
-  const signStr = Object.keys(params)
-    .filter((k) => k !== "sign" && params[k] !== "")
-    .sort()
-    .map((k) => {
-      const v = String(params[k]);
-      if (k === "notify_url" || k === "return_url") {
-        return `${k}=${v}`;
-      }
-      return `${k}=${encodeURIComponent(v)}`;
-    })
-    .join("&");
-
-  const verifier = crypto.createVerify("RSA-SHA256");
-  verifier.update(signStr, "utf8");
-  const okVerify = verifier.verify(publicPem, signFromHtml, "base64");
-  assert.equal(okVerify, true, "手动重算签名应匹配 form 里的 sign 字段");
-});
-
-test("v3 待签字符串包含特殊字符 (*、~、空格) 的编码", async () => {
-  const { privatePem, publicPem } = generateTestKeyPair();
-  setAlipayEnv(privatePem, publicPem);
-
-  const { buildAlipayCreatePayload, getAlipayConfig } = await import(alipayModulePath);
-  const cfg = getAlipayConfig();
-
-  // subject 含特殊字符
-  const payload = buildAlipayCreatePayload(
-    {
-      outTradeNo: "ORDER_SPECIAL",
-      totalAmount: "19.90",
-      subject: "校招喵 永久VIP*~test",  // 含空格、星号、波浪号
     },
     cfg
   );
@@ -244,15 +180,63 @@ test("v3 待签字符串包含特殊字符 (*、~、空格) 的编码", async ()
     params[m[1]] = m[2].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
   }
 
-  // 手动重算（按当前代码 v3 算法：URL 字段保持原样，其它字段 encodeURIComponent，
-//                 * 强制编码为 %2A，%7E 还原为 ~）
+  // 手动重算（按支付宝 CLI 工具算法：全部 encodeURIComponent，
+  //                 + → %20，* → %2A，%7E → ~）
   const signStr = Object.keys(params)
     .filter((k) => k !== "sign" && params[k] !== "")
     .sort()
     .map((k) => {
-      const v = String(params[k]);
-      if (k === "notify_url" || k === "return_url") return `${k}=${v}`;
-      let encoded = encodeURIComponent(v);
+      let encoded = encodeURIComponent(params[k]);
+      encoded = encoded.replace(/\+/g, "%20");
+      encoded = encoded.replace(/\*/g, "%2A");
+      encoded = encoded.replace(/%7E/g, "~");
+      return `${k}=${encoded}`;
+    })
+    .join("&");
+
+  const verifier = crypto.createVerify("RSA-SHA256");
+  verifier.update(signStr, "utf8");
+  const okVerify = verifier.verify(publicPem, signFromHtml, "base64");
+  assert.equal(okVerify, true, "手动重算签名应匹配 form 里的 sign 字段");
+
+  // 关键断言：notify_url 必须编码（冒号 %3A、斜杠 %2F）
+  assert.match(signStr, /notify_url=https%3A%2F%2F/, "notify_url 必须做完整 URL 编码");
+});
+
+test("v3 待签字符串包含特殊字符 (*、~、空格) 的编码", async () => {
+  const { privatePem, publicPem } = generateTestKeyPair();
+  setAlipayEnv(privatePem, publicPem);
+
+  const { buildAlipayCreatePayload, getAlipayConfig } = await import(alipayModulePath);
+  const cfg = getAlipayConfig();
+
+  const payload = buildAlipayCreatePayload(
+    {
+      outTradeNo: "ORDER_SPECIAL",
+      totalAmount: "19.90",
+      subject: "校招喵 永久VIP*~test",
+    },
+    cfg
+  );
+
+  const signMatch = payload.formHtml.match(/name="sign"\s+value="([^"]+)"/);
+  assert.ok(signMatch);
+  const signFromHtml = signMatch![1];
+  const fieldRegex = /name="([^"]+)"\s+value="((?:[^"\\]|\\.)*)"/g;
+  const params: Record<string, string> = {};
+  let m: RegExpExecArray | null;
+  while ((m = fieldRegex.exec(payload.formHtml)) !== null) {
+    if (m[1] === "sign") continue;
+    params[m[1]] = m[2].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  }
+
+  // 手动重算（与支付宝 CLI 工具一致）
+  const signStr = Object.keys(params)
+    .filter((k) => k !== "sign" && params[k] !== "")
+    .sort()
+    .map((k) => {
+      let encoded = encodeURIComponent(params[k]);
+      encoded = encoded.replace(/\+/g, "%20");
       encoded = encoded.replace(/\*/g, "%2A");
       encoded = encoded.replace(/%7E/g, "~");
       return `${k}=${encoded}`;
